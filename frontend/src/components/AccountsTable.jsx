@@ -1,8 +1,8 @@
 import { useState, Fragment } from 'react'
 
 function getRiskLevel(score) {
-    if (score >= 70) return 'high'
-    if (score >= 40) return 'medium'
+    if (score >= 80) return 'high'
+    if (score >= 55) return 'medium'
     return 'low'
 }
 
@@ -31,6 +31,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                             <th>#</th>
                             <th>Account ID</th>
                             <th>Risk Score</th>
+                            <th>Tier</th>
                             <th>Patterns</th>
                             <th>Rings</th>
                             {!compact && <th>Action</th>}
@@ -68,6 +69,11 @@ export default function AccountsTable({ accounts, compact = false }) {
                                             </div>
                                         </td>
                                         <td>
+                                            <span className={`tier-badge tier-${(account.tier || 'low').toLowerCase()}`}>
+                                                {account.tier || 'LOW'}
+                                            </span>
+                                        </td>
+                                        <td>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                                 {(account.patterns || []).slice(0, compact ? 2 : 5).map((p, j) => (
                                                     <span key={j} className="pattern-tag">{p.replace(/_/g, ' ')}</span>
@@ -96,7 +102,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${account.account_id}-detail`}>
-                                            <td colSpan={compact ? 5 : 6} style={{ padding: '0 24px 24px' }}>
+                                            <td colSpan={compact ? 6 : 7} style={{ padding: '0 24px 24px' }}>
                                                 <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '8px', padding: '24px', border: '1px solid var(--border)' }}>
                                                     <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '16px' }}>
                                                         Forensic Explanation
@@ -107,12 +113,26 @@ export default function AccountsTable({ accounts, compact = false }) {
                                                         </div>
                                                     </div>
 
+                                                    {account.signal_summary && (
+                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                                                            {account.signal_summary.multi_signal_gate && (
+                                                                <span className="tier-badge tier-high" style={{ fontSize: '0.55rem' }}>MULTI-SIGNAL CONFIRMED</span>
+                                                            )}
+                                                            {account.signal_summary.has_structural && (
+                                                                <span className="pattern-tag" style={{ borderColor: 'var(--accent)' }}>STRUCTURAL</span>
+                                                            )}
+                                                            {account.signal_summary.has_behavioral && (
+                                                                <span className="pattern-tag" style={{ borderColor: 'var(--warning)' }}>BEHAVIORAL</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
                                                     {account.score_breakdown && (
                                                         <div style={{ marginTop: '24px' }}>
                                                             <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '12px' }}>
                                                                 Detection Metrics
                                                             </div>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
                                                                 {account.score_breakdown.map((sb, j) => (
                                                                     <div key={j} style={{
                                                                         fontSize: '0.7rem',
@@ -121,9 +141,18 @@ export default function AccountsTable({ accounts, compact = false }) {
                                                                         padding: '8px 12px',
                                                                         background: 'rgba(255,255,255,0.02)',
                                                                         borderRadius: '4px',
-                                                                        border: '1px solid var(--border)'
+                                                                        border: '1px solid var(--border)',
+                                                                        display: 'flex',
+                                                                        justifyContent: 'space-between',
+                                                                        alignItems: 'center',
                                                                     }}>
-                                                                        {sb.module}: {(sb.weighted * 100).toFixed(0)}%
+                                                                        <span>{sb.module.replace(/_/g, ' ')}</span>
+                                                                        <span style={{
+                                                                            color: sb.signal_strength === 'STRONG' ? 'var(--danger)' : 'var(--text-muted)',
+                                                                            fontSize: '0.6rem',
+                                                                        }}>
+                                                                            {sb.signal_class || sb.signal_strength} · {(sb.weighted * 100).toFixed(0)}%
+                                                                        </span>
                                                                     </div>
                                                                 ))}
                                                             </div>

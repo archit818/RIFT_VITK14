@@ -4,6 +4,7 @@ import AccountsTable from './AccountsTable'
 import FraudRings from './FraudRings'
 import GraphView from './GraphView'
 import PatternBreakdown from './PatternBreakdown'
+import Chatbot from './Chatbot'
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
@@ -166,6 +167,9 @@ export default function Dashboard({ results, apiBase, onReset }) {
                     GENERATE_FULL_REPORT
                 </button>
             </div>
+
+            {/* Task 8: Chatbot Explainability Layer */}
+            <Chatbot apiBase={apiBase} accounts={suspicious_accounts} />
         </div>
     );
 }

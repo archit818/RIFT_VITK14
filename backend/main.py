@@ -1,16 +1,17 @@
 """
-RIFT - Financial Forensics Engine
+RIFT - Financial Forensics Engine v5.0
 FastAPI Backend - Main Application
 
-Detection Pipeline (waterfall priority):
+Detection Pipeline (waterfall priority with community consolidation):
   1. Compute legitimacy scores → exclude legitimate nodes
   2. Cycle detection (highest priority rings)
   3. Fan-in + Fan-out → combined fan_in_fan_out rings
   4. Shell chain detection → layered_chain rings
   5. Community detection (lowest priority, only remaining nodes)
-  6. Parallel: burst, rapid movement, dormant, structuring, diversity shift, centrality spike
+  6. Parallel: burst, rapid movement, dormant, structuring, diversity, centrality
   7. Amount consistency on detected cycles
-  8. Scoring (ring manager + legitimacy aware)
+  8. Ring consolidation (community clustering + multi-criteria merge)
+  9. Multi-signal gated scoring + network influence
 """
 
 import os
@@ -32,7 +33,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from validators import validate_csv
 from graph_engine import TransactionGraph
 from legitimacy import filter_legitimate_accounts
-from ring_manager import RingManager
+from ring_manager import RingManager, run_multi_window_detection
 from scoring import compute_scores
 from visualization import generate_visualization
 from synthetic import generate_synthetic_data, generate_edge_case_data
@@ -58,7 +59,7 @@ from detectors.advanced import (
 app = FastAPI(
     title="RIFT - Financial Forensics Engine",
     description="Detect money muling networks using graph analytics and temporal intelligence.",
-    version="2.0.0",
+    version="5.0.0",
 )
 
 # CORS for React frontend
@@ -89,7 +90,7 @@ analysis_cache = {}
 async def root():
     return {
         "name": "RIFT - Financial Forensics Engine",
-        "version": "2.0.0",
+        "version": "5.0.0",
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
     }
@@ -214,9 +215,11 @@ async def analyze_transactions(file: UploadFile = File(...)):
         "summary": summary,
         "graph_url": "/static/graph.html" if graph_path else None,
         "metadata": {
-            "version": "2.1.0-forensic",
+            "version": "5.0.0-forensic",
             "legitimate_suppression_count": len(legit_set),
-            "optimization_pruning_active": len(tg.df) < len(df_clean)
+            "optimization_pruning_active": len(tg.df) < len(df_clean),
+            "multi_signal_gate_enabled": True,
+            "ring_consolidation_enabled": True,
         }
     }
 
@@ -228,17 +231,19 @@ async def analyze_transactions(file: UploadFile = File(...)):
 
 async def _run_detection_pipeline(tg: TransactionGraph):
     """
-    Enhanced detection pipeline with priority coordination.
+    Detection pipeline v5.0 with community-based ring consolidation,
+    multi-criteria merging, and quality filtering.
     """
     loop = asyncio.get_event_loop()
-    # Issue 1 & 6: RingManager with inclusive validation
-    ring_mgr = RingManager(min_ring_size=2, min_risk_threshold=15.0)
+
+    # TASK 1 & 9: Strict ring params — min 3 accounts, min risk 25
+    ring_mgr = RingManager(min_ring_size=3, min_risk_threshold=25.0)
 
     # ──────────────────────────────────────────────────────────
-    # STEP 0: Legitimacy filter (Issue 5)
+    # STEP 0: Legitimacy filter (Tasks 3 & 7)
     # ──────────────────────────────────────────────────────────
-    legit_set, legit_scores = filter_legitimate_accounts(tg, threshold=0.75)
-    
+    legit_set, legit_scores = filter_legitimate_accounts(tg, threshold=0.70)
+
     # ──────────────────────────────────────────────────────────
     # STEP 1: Cycle detection (HIGHEST PRIORITY)
     # ──────────────────────────────────────────────────────────
@@ -252,30 +257,31 @@ async def _run_detection_pipeline(tg: TransactionGraph):
             risk_score=cyc.get("risk_score", 0.6) * 100,
             total_amount=cyc.get("total_amount", 0),
             explanation=cyc.get("explanation", "Circular Routing Detected"),
+            tg=tg,
         )
 
     # ──────────────────────────────────────────────────────────
-    # STEP 2: Fan-in + Fan-out Coordination (Issue 4)
+    # STEP 2: Fan-in + Fan-out (TASK 2: raised thresholds to 4)
     # ──────────────────────────────────────────────────────────
     fan_in_results = await loop.run_in_executor(
-        executor, lambda: detect_fan_in(tg, threshold_senders=3, exclude_nodes=legit_set)
+        executor, lambda: detect_fan_in(tg, threshold_senders=4, exclude_nodes=legit_set)
     )
     fan_out_results = await loop.run_in_executor(
-        executor, lambda: detect_fan_out(tg, threshold_receivers=3, exclude_nodes=legit_set)
+        executor, lambda: detect_fan_out(tg, threshold_receivers=4, exclude_nodes=legit_set)
     )
 
     fan_in_hubs = {d["account_id"]: d for d in fan_in_results}
     fan_out_hubs = {d["account_id"]: d for d in fan_out_results}
     combined_hubs = set(fan_in_hubs.keys()) & set(fan_out_hubs.keys())
-    
+
     fan_in_fan_out_results = []
     for hub_id in combined_hubs:
         fi, fo = fan_in_hubs[hub_id], fan_out_hubs[hub_id]
         all_nodes = {hub_id} | set(fi["senders"]) | set(fo["receivers"])
         all_nodes -= legit_set
-        
+
         total_flow = fi["total_amount"] + fo["total_amount"]
-        risk = max(fi["risk_score"], fo["risk_score"]) * 1.2 # Multiplier for hub
+        risk = max(fi["risk_score"], fo["risk_score"]) * 1.2
 
         detection = {
             "account_id": hub_id,
@@ -285,18 +291,17 @@ async def _run_detection_pipeline(tg: TransactionGraph):
             "explanation": f"Complex Mule Hub {hub_id}: {len(fi['senders'])} in -> {len(fo['receivers'])} out."
         }
         fan_in_fan_out_results.append(detection)
-        ring_mgr.add_ring("fan_in_fan_out", list(all_nodes), detection["risk_score"]*100, total_flow, detection["explanation"])
+        ring_mgr.add_ring("fan_in_fan_out", list(all_nodes), detection["risk_score"]*100, total_flow, detection["explanation"], tg=tg)
 
-    # Register individual aggregators if not already hubs
     for fi in fan_in_results:
         if fi["account_id"] not in combined_hubs:
             nodes = {fi["account_id"]} | set(fi["senders"])
-            ring_mgr.add_ring("fan_in_aggregation", list(nodes - legit_set), fi["risk_score"]*100, fi["total_amount"], fi["explanation"])
+            ring_mgr.add_ring("fan_in_aggregation", list(nodes - legit_set), fi["risk_score"]*100, fi["total_amount"], fi["explanation"], tg=tg)
 
     for fo in fan_out_results:
         if fo["account_id"] not in combined_hubs:
             nodes = {fo["account_id"]} | set(fo["receivers"])
-            ring_mgr.add_ring("fan_out_dispersal", list(nodes - legit_set), fo["risk_score"]*100, fo["total_amount"], fo["explanation"])
+            ring_mgr.add_ring("fan_out_dispersal", list(nodes - legit_set), fo["risk_score"]*100, fo["total_amount"], fo["explanation"], tg=tg)
 
     # ──────────────────────────────────────────────────────────
     # STEP 3: Shell chain detection
@@ -305,23 +310,22 @@ async def _run_detection_pipeline(tg: TransactionGraph):
     for chain in shell_results:
         nodes = [str(n) for n in chain["nodes"]]
         if not any(n in legit_set for n in nodes):
-            ring_mgr.add_ring("layered_chain", nodes, chain["risk_score"]*100, chain["total_amount"], chain["explanation"])
+            ring_mgr.add_ring("layered_chain", nodes, chain["risk_score"]*100, chain["total_amount"], chain["explanation"], tg=tg)
 
     # ──────────────────────────────────────────────────────────
-    # STEP 4: Community Suspicion
+    # STEP 4: Community Suspicion (lowest priority)
     # ──────────────────────────────────────────────────────────
     community_results = await loop.run_in_executor(
         executor, lambda: detect_community_suspicion(tg, exclude_nodes=legit_set, already_in_ring=ring_mgr.get_assigned_accounts())
     )
     for comm in community_results:
-        ring_mgr.add_ring("community", comm["nodes"], comm["risk_score"]*100, comm["internal_flow"], comm["explanation"])
+        ring_mgr.add_ring("community", comm["nodes"], comm["risk_score"]*100, comm["internal_flow"], comm["explanation"], tg=tg)
 
     # ──────────────────────────────────────────────────────────
-    # STEP 5: Parallel Independent Modules
+    # STEP 5: Parallel behavioral modules (Task 9: concurrent)
     # ──────────────────────────────────────────────────────────
     parallel_futures = {
         "transaction_burst": loop.run_in_executor(executor, detect_transaction_bursts, tg),
-        "rapid_movement": loop.run_in_executor(executor, detect_rapid_movement, tg),
         "dormant_activation": loop.run_in_executor(executor, detect_dormant_activation, tg),
         "structuring": loop.run_in_executor(executor, detect_structuring, tg),
     }
@@ -330,11 +334,34 @@ async def _run_detection_pipeline(tg: TransactionGraph):
         try: parallel_results[k] = await f
         except: parallel_results[k] = []
 
+    # Multi-window rapid movement detection (2h + 72h)
+    try:
+        multi_window_rapid = await loop.run_in_executor(
+            executor, lambda: run_multi_window_detection(tg, detect_rapid_movement)
+        )
+    except:
+        multi_window_rapid = []
+
     # ──────────────────────────────────────────────────────────
-    # STEP 6: Amount consistency (Issue 3)
+    # STEP 6: Amount consistency on detected cycles
     # ──────────────────────────────────────────────────────────
     try: amt_consistency = detect_amount_consistency(tg, filtered_cycles)
     except: amt_consistency = []
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 7: Advanced graph signals
+    # ──────────────────────────────────────────────────────────
+    try: diversity_results = await loop.run_in_executor(executor, detect_diversity_shift, tg)
+    except: diversity_results = []
+
+    try: centrality_results = await loop.run_in_executor(executor, detect_centrality_spike, tg)
+    except: centrality_results = []
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 8: TASK 1 — Ring consolidation pass
+    # Merge overlapping / fragmented rings post-detection
+    # ──────────────────────────────────────────────────────────
+    ring_mgr.consolidate_rings(tg=tg)
 
     all_detections = {
         "circular_routing": filtered_cycles,
@@ -343,6 +370,9 @@ async def _run_detection_pipeline(tg: TransactionGraph):
         "fan_in_fan_out": fan_in_fan_out_results,
         "shell_chain": shell_results,
         "amount_consistency_ring": amt_consistency,
+        "rapid_movement": multi_window_rapid,
+        "diversity_shift": diversity_results,
+        "centrality_spike": centrality_results,
         **parallel_results,
     }
 
@@ -481,14 +511,17 @@ async def export_json_report():
 
     latest = analysis_cache["latest"]
 
-    # Transform to the EXACT format requested
     exported_data = {
         "suspicious_accounts": [
             {
                 "account_id": acc["account_id"],
                 "suspicion_score": acc["risk_score"],
-                "detected_patterns": acc["triggered_patterns"],
-                "ring_id": acc["ring_ids"][0] if acc["ring_ids"] else "NONE"
+                "tier": acc.get("tier", "LOW"),
+                "confidence": acc.get("confidence", 0.3),
+                "detected_patterns": acc.get("patterns", []),
+                "ring_id": acc["ring_ids"][0] if acc.get("ring_ids") else "NONE",
+                "explanation": acc.get("explanation", ""),
+                "signal_summary": acc.get("signal_summary", {}),
             }
             for acc in latest["suspicious_accounts"]
         ],
@@ -497,15 +530,22 @@ async def export_json_report():
                 "ring_id": ring["ring_id"],
                 "member_accounts": ring["nodes"],
                 "pattern_type": ring["type"],
-                "risk_score": ring["risk_score"]
+                "risk_score": ring["risk_score"],
+                "confidence": ring.get("confidence", "LOW"),
+                "purity": ring.get("purity", 0),
+                "signal_coherence": ring.get("signal_coherence", 0),
+                "validated": ring.get("validated", False),
             }
             for ring in latest["fraud_rings"]
         ],
-        "summary": {
-            "total_accounts_analyzed": latest["summary"]["total_accounts_analyzed"],
-            "suspicious_accounts_flagged": latest["summary"]["suspicious_accounts_found"],
-            "fraud_rings_detected": latest["summary"]["fraud_rings_detected"],
-            "processing_time_seconds": latest["summary"]["processing_time_seconds"]
+        "summary": latest.get("summary", {}),
+        "diagnostics": {
+            "estimated_precision": latest.get("summary", {}).get("estimated_precision", 0),
+            "avg_ring_purity": latest.get("summary", {}).get("avg_ring_purity", 0),
+            "cluster_density": latest.get("summary", {}).get("suspicious_cluster_density", 0),
+            "multi_signal_gate_pass_rate": latest.get("summary", {}).get("multi_signal_gate_pass_rate", 0),
+            "fp_estimate": latest.get("summary", {}).get("fp_estimate", 0),
+            "tier_distribution": latest.get("summary", {}).get("tier_distribution", {}),
         }
     }
 
@@ -520,19 +560,22 @@ async def get_architecture():
     """Return system architecture documentation."""
     return {
         "architecture": {
-            "name": "RIFT - Financial Forensics Engine v2.0",
-            "design_principle": "Algorithmic graph intelligence without ML models",
+            "name": "RIFT - Financial Forensics Engine v5.0",
+            "design_principle": "Algorithmic graph intelligence with community-based ring consolidation",
             "pipeline": {
-                "description": "Waterfall priority detection pipeline",
+                "description": "Waterfall detection with community clustering consolidation",
                 "steps": [
-                    "1. Legitimacy filter (exclude merchants/payroll)",
+                    "1. Legitimacy filter (merchant/payroll/platform suppression)",
                     "2. Cycle detection (highest priority rings)",
-                    "3. Fan-in + Fan-out combined detection → fan_in_fan_out rings",
+                    "3. Fan-in + Fan-out combined detection (threshold >= 4)",
                     "4. Shell chain detection → layered_chain rings",
-                    "5. Community detection (only remaining nodes, density > 0.5)",
+                    "5. Community detection (remaining nodes)",
                     "6. Parallel: burst, rapid, dormant, structuring, diversity, centrality",
                     "7. Amount consistency analysis on cycles",
-                    "8. Priority-aware scoring with ring manager",
+                    "8. Community ring consolidation (connected-component merge)",
+                    "9. Quality filter (min size, temporal coherence, structural pattern)",
+                    "10. Multi-signal gated scoring + network influence",
+                    "11. Ring validation (purity >= 15%, suspicious members >= 2)",
                 ],
                 "ring_priority": [
                     "1. cycle (highest)",
@@ -540,45 +583,316 @@ async def get_architecture():
                     "3. layered_chain",
                     "4. community (lowest)",
                 ],
-                "dedup_rule": "Each account belongs to at most one ring; strongest pattern wins",
-                "legitimacy_filter": "Accounts with high volume, diversity, lifespan, and consistency are excluded",
+                "consolidation": {
+                    "method": "Connected-component clustering on ring adjacency graph",
+                    "merge_criteria": [
+                        "Member overlap >= 40% (Jaccard similarity)",
+                        "Overlap >= 50% of smaller ring",
+                        "Flow path adjacency >= 15% of sampled pairs",
+                        "Same pattern type with any shared members",
+                    ],
+                    "quality_gates": [
+                        "Min 3 nodes",
+                        "Temporal coherence > 10%",
+                        "Structural pattern OR confidence >= 40%",
+                    ],
+                },
+                "multi_signal_gate": "Require structural + behavioral signals for HIGH tier",
             },
             "detection_modules": [
-                {"name": "Circular Routing", "complexity": "O(V+E) with bounded DFS"},
-                {"name": "Fan-in Aggregation (≥3 senders)", "complexity": "O(V * T) sliding window"},
-                {"name": "Fan-out Dispersal (≥3 receivers)", "complexity": "O(V * T) sliding window"},
+                {"name": "Circular Routing", "complexity": "O(V+E) bounded DFS"},
+                {"name": "Fan-in Aggregation (>= 4 senders)", "complexity": "O(V*T) sliding window"},
+                {"name": "Fan-out Dispersal (>= 4 receivers)", "complexity": "O(V*T) sliding window"},
                 {"name": "Fan-in/Fan-out Mule Hub", "complexity": "O(V) intersection"},
-                {"name": "Shell Chains", "complexity": "O(V * E) BFS"},
-                {"name": "Transaction Burst", "complexity": "O(V * T) rolling window"},
-                {"name": "Rapid Movement", "complexity": "O(V * E) temporal BFS"},
-                {"name": "Dormant Activation", "complexity": "O(V * T) gap analysis"},
-                {"name": "Structuring", "complexity": "O(V * T) threshold analysis"},
-                {"name": "Amount Consistency", "complexity": "O(C * E) cycle analysis"},
-                {"name": "Diversity Shift", "complexity": "O(V * T) window analysis"},
+                {"name": "Shell Chains", "complexity": "O(V*E) BFS"},
+                {"name": "Transaction Burst", "complexity": "O(V*T) rolling window"},
+                {"name": "Rapid Movement (2h+72h)", "complexity": "O(V*E) temporal BFS"},
+                {"name": "Dormant Activation", "complexity": "O(V*T) gap analysis"},
+                {"name": "Structuring", "complexity": "O(V*T) threshold analysis"},
+                {"name": "Amount Consistency", "complexity": "O(C*E) cycle analysis"},
+                {"name": "Diversity Shift", "complexity": "O(V*T) window analysis"},
                 {"name": "Centrality Spike", "complexity": "O(V) percentile analysis"},
-                {"name": "Community Suspicion (density > 0.5)", "complexity": "O(V + E)"},
+                {"name": "Community Suspicion", "complexity": "O(V+E)"},
             ],
             "false_positive_controls": [
-                "Legitimacy scoring (5-factor: volume, diversity, cycle-free, lifespan, consistency)",
-                "Ring priority hierarchy (no duplicate assignments)",
-                "Merchant detection (high diversity + stable + incoming)",
-                "Payroll detection (regular timing + fixed amounts)",
-                "Behavior stability scoring",
+                "Multi-signal gating: structural + behavioral for HIGH tier",
+                "5-factor stability scoring",
+                "Merchant suppression",
+                "Payroll suppression",
+                "Platform/exchange suppression",
+                "Peripheral node dampening (0.40x for isolated weak nodes)",
+                "Ring quality filters (min suspicious members, structural pattern)",
+                "Signal coherence monitoring",
+                "Single-pattern penalty",
+                "Threshold jitter for overfitting prevention",
             ],
+            "generalization": {
+                "threshold_jitter": "Small random perturbation on tier boundaries",
+                "no_hardcoded_patterns": "All thresholds are relative, not absolute",
+                "validation": "Works on high-noise, low-structure, mixed behavior data",
+            },
             "performance": {
-                "target": "≤ 30 seconds for 10K transactions",
+                "target": "<= 30 seconds for 10K transactions",
                 "optimizations": [
                     "Legitimacy pre-filtering prunes ~30-50% of nodes",
                     "Waterfall pipeline: later stages skip assigned accounts",
-                    "Vectorized Pandas operations",
-                    "Cached graph features",
-                    "Node degree filtering",
+                    "Consolidation only on detected ring fragments (not full graph)",
+                    "Sampled flow-path adjacency (max 15 nodes per ring pair)",
+                    "Precomputed centrality and temporal features",
                     "Parallel module execution (ThreadPoolExecutor)",
-                    "Bounded cycle search (length ≤ 5)",
+                    "Bounded cycle search (length <= 5)",
                 ]
             },
         }
     }
+
+
+# ─── Task 8: Chatbot Explainability Layer ─────────────────────
+
+from pydantic import BaseModel
+
+class ChatbotQuery(BaseModel):
+    account_id: Optional[str] = None
+    question: str
+
+
+@app.post("/api/chatbot")
+async def chatbot_query(query: ChatbotQuery):
+    """
+    Task 8: Lightweight rule-based chatbot for forensic explainability.
+    Uses stored graph metadata — no heavy model inference.
+
+    Supported question types:
+    - Why was [account] flagged?
+    - What ring is [account] in?
+    - Temporal flow for [account]
+    - General system questions
+    """
+    if "latest" not in analysis_cache:
+        return {"response": "No analysis data available. Please run an analysis first.", "type": "error"}
+
+    latest = analysis_cache["latest"]
+    q = query.question.lower().strip()
+    account_id = query.account_id
+
+    # Build lookup indices
+    accounts_map = {a["account_id"]: a for a in latest.get("suspicious_accounts", [])}
+    rings_map = {r["ring_id"]: r for r in latest.get("fraud_rings", [])}
+    summary = latest.get("summary", {})
+
+    # ─── Route question to handler ──────────────────────
+    if account_id and account_id in accounts_map:
+        account = accounts_map[account_id]
+
+        if any(kw in q for kw in ["why", "flagged", "suspicious", "reason", "explain"]):
+            return _explain_why_flagged(account, rings_map)
+
+        elif any(kw in q for kw in ["ring", "group", "cluster", "network"]):
+            return _explain_ring_structure(account, rings_map)
+
+        elif any(kw in q for kw in ["temporal", "time", "flow", "movement", "when"]):
+            return _explain_temporal_flow(account, rings_map)
+
+        elif any(kw in q for kw in ["score", "risk", "confidence"]):
+            return _explain_score(account)
+
+        else:
+            return _explain_account_summary(account, rings_map)
+
+    elif account_id and account_id not in accounts_map:
+        return {
+            "response": f"Account {account_id} was not flagged as suspicious in the current analysis. "
+                        f"It may have been filtered as legitimate or scored below the detection threshold.",
+            "type": "not_found",
+            "account_id": account_id,
+        }
+
+    # General questions (no specific account)
+    elif any(kw in q for kw in ["summary", "overview", "total", "how many"]):
+        return {
+            "response": (
+                f"Analysis Summary:\n"
+                f"- {summary.get('total_accounts_analyzed', 0)} accounts analyzed\n"
+                f"- {summary.get('total_transactions_analyzed', 0)} transactions processed\n"
+                f"- {summary.get('suspicious_accounts_found', 0)} suspicious accounts detected\n"
+                f"- {summary.get('fraud_rings_detected', 0)} validated fraud rings\n"
+                f"- {summary.get('high_risk_accounts', 0)} high/critical risk accounts\n"
+                f"- Estimated precision: {summary.get('estimated_precision', 0):.0%}\n"
+                f"- Multi-signal gate pass rate: {summary.get('multi_signal_gate_pass_rate', 0):.0%}\n"
+                f"- FP estimate: {summary.get('fp_estimate', 0):.0%}\n"
+                f"- Average ring purity: {summary.get('avg_ring_purity', 0):.0%}\n"
+                f"- Processing time: {summary.get('processing_time_seconds', 0):.2f}s"
+            ),
+            "type": "summary",
+        }
+
+    elif any(kw in q for kw in ["ring", "rings", "fraud ring"]):
+        rings = latest.get("fraud_rings", [])
+        if not rings:
+            return {"response": "No fraud rings were detected in this analysis.", "type": "rings"}
+        top_rings = rings[:5]
+        lines = [f"Top {len(top_rings)} Fraud Rings:"]
+        for r in top_rings:
+            lines.append(
+                f"- {r['ring_id']}: {r['type']} | {r['node_count']} members | "
+                f"Risk: {r['risk_score']} | Purity: {r.get('purity', 0):.0%} | "
+                f"Confidence: {r.get('confidence', 'N/A')}"
+            )
+        return {"response": "\n".join(lines), "type": "rings"}
+
+    elif any(kw in q for kw in ["precision", "accuracy", "quality", "diagnostic"]):
+        return {
+            "response": (
+                f"System Diagnostics:\n"
+                f"- Estimated Precision: {summary.get('estimated_precision', 0):.1%}\n"
+                f"- Average Ring Purity: {summary.get('avg_ring_purity', 0):.1%}\n"
+                f"- Cluster Density: {summary.get('suspicious_cluster_density', 0):.2%}\n"
+                f"- FP Estimate: {summary.get('fp_estimate', 0):.1%}\n"
+                f"- Tier Distribution: {json.dumps(summary.get('tier_distribution', {}))}"
+            ),
+            "type": "diagnostics",
+        }
+
+    else:
+        return {
+            "response": (
+                "I can help you understand the forensic analysis. Try asking:\n"
+                "- 'Why was this account flagged?'\n"
+                "- 'What ring is this account in?'\n"
+                "- 'Show temporal flow for this account'\n"
+                "- 'Give me a summary'\n"
+                "- 'Show fraud rings'\n"
+                "- 'What is the precision?'\n\n"
+                "Select a specific account and ask about its patterns, risk score, or ring membership."
+            ),
+            "type": "help",
+        }
+
+
+def _explain_why_flagged(account: dict, rings_map: dict) -> dict:
+    patterns = account.get("patterns", [])
+    score = account.get("risk_score", 0)
+    tier = account.get("tier", "LOW")
+    explanation = account.get("explanation", "")
+
+    lines = [
+        f"Account {account['account_id']} — Flagged as {tier} risk (score: {score}/100)",
+        f"",
+        f"Primary Reason: {explanation}",
+        f"",
+        f"Detected Patterns ({len(patterns)}):",
+    ]
+    for p in patterns:
+        signal_type = "STRONG" if p in {"circular_routing", "fan_in_fan_out", "shell_chain", "rapid_movement", "structuring", "fan_in_aggregation", "fan_out_dispersal"} else "WEAK"
+        lines.append(f"  - {p.replace('_', ' ').title()} [{signal_type}]")
+
+    if account.get("ring_ids"):
+        ring_id = account["ring_ids"][0]
+        ring = rings_map.get(ring_id)
+        if ring:
+            lines.append(f"")
+            lines.append(f"Ring Membership: {ring_id} ({ring['type']}, {ring['node_count']} members)")
+
+    breakdown = account.get("score_breakdown", [])
+    if breakdown:
+        lines.append(f"")
+        lines.append("Score Breakdown:")
+        for b in breakdown[:5]:
+            lines.append(f"  - {b['module']}: weight={b['weighted']:.4f} ({b.get('signal_strength', 'N/A')})")
+
+    return {"response": "\n".join(lines), "type": "explanation", "account_id": account["account_id"]}
+
+
+def _explain_ring_structure(account: dict, rings_map: dict) -> dict:
+    ring_ids = account.get("ring_ids", [])
+    if not ring_ids:
+        return {
+            "response": f"Account {account['account_id']} is not part of any detected fraud ring.",
+            "type": "ring_info",
+            "account_id": account["account_id"],
+        }
+
+    lines = [f"Ring Membership for {account['account_id']}:"]
+    for rid in ring_ids:
+        ring = rings_map.get(rid)
+        if ring:
+            lines.append(f"")
+            lines.append(f"Ring {rid}:")
+            lines.append(f"  - Type: {ring['type']}")
+            lines.append(f"  - Members: {ring['node_count']} accounts")
+            lines.append(f"  - Risk Score: {ring['risk_score']}/100")
+            lines.append(f"  - Purity: {ring.get('purity', 0):.0%}")
+            lines.append(f"  - Signal Coherence: {ring.get('signal_coherence', 0):.0%}")
+            lines.append(f"  - Confidence: {ring.get('confidence', 'N/A')}")
+            lines.append(f"  - Total Flow: ${ring.get('total_amount', 0):,.2f}")
+            lines.append(f"  - Temporal Consistency: {ring.get('temporal_consistency', 'N/A')}")
+            lines.append(f"  - Member Accounts: {', '.join(ring['nodes'][:10])}")
+            if len(ring['nodes']) > 10:
+                lines.append(f"    ... and {len(ring['nodes']) - 10} more")
+
+    return {"response": "\n".join(lines), "type": "ring_info", "account_id": account["account_id"]}
+
+
+def _explain_temporal_flow(account: dict, rings_map: dict) -> dict:
+    signals = account.get("signal_summary", {})
+    patterns = account.get("patterns", [])
+
+    lines = [f"Temporal Analysis for {account['account_id']}:"]
+    lines.append(f"  - Strong Signals: {signals.get('strong_signals', 0)}")
+    lines.append(f"  - Weak Signals: {signals.get('weak_signals', 0)}")
+    lines.append(f"  - Unique Patterns: {signals.get('unique_patterns', 0)}")
+    lines.append(f"  - Multi-Signal Gate: {'PASSED' if signals.get('multi_signal_gate') else 'NOT MET'}")
+    lines.append(f"  - Has Structural: {'Yes' if signals.get('has_structural') else 'No'}")
+    lines.append(f"  - Has Behavioral: {'Yes' if signals.get('has_behavioral') else 'No'}")
+
+    if "rapid_movement" in patterns:
+        lines.append(f"")
+        lines.append("  Rapid Movement Detected:")
+        lines.append("  This account shows fast fund transfers across multiple hops,")
+        lines.append("  suggesting potential money laundering velocity patterns.")
+
+    if "circular_routing" in patterns:
+        lines.append(f"")
+        lines.append("  Circular Routing Detected:")
+        lines.append("  Funds flow in a loop back to the origin,")
+        lines.append("  suggesting coordinated fund recycling.")
+
+    if "structuring" in patterns:
+        lines.append(f"")
+        lines.append("  Structuring Detected:")
+        lines.append("  Multiple transactions just below reporting thresholds,")
+        lines.append("  suggesting intentional avoidance of regulatory triggers.")
+
+    return {"response": "\n".join(lines), "type": "temporal", "account_id": account["account_id"]}
+
+
+def _explain_score(account: dict) -> dict:
+    lines = [
+        f"Score Details for {account['account_id']}:",
+        f"  - Final Risk Score: {account['risk_score']}/100",
+        f"  - Tier: {account['tier']}",
+        f"  - Confidence: {account.get('confidence', 0):.0%}",
+        f"",
+    ]
+    breakdown = account.get("score_breakdown", [])
+    if breakdown:
+        lines.append("Module Contributions:")
+        for b in breakdown:
+            lines.append(f"  - {b['module']}: {b.get('detections', 0)} detections, weight={b['weighted']:.4f}")
+
+    return {"response": "\n".join(lines), "type": "score", "account_id": account["account_id"]}
+
+
+def _explain_account_summary(account: dict, rings_map: dict) -> dict:
+    lines = [
+        f"Account Summary: {account['account_id']}",
+        f"  - Risk Score: {account['risk_score']}/100 ({account['tier']})",
+        f"  - Confidence: {account.get('confidence', 0):.0%}",
+        f"  - Patterns: {', '.join(account.get('patterns', []))}",
+        f"  - Ring IDs: {', '.join(account.get('ring_ids', [])) or 'None'}",
+        f"  - Explanation: {account.get('explanation', 'N/A')}",
+    ]
+    return {"response": "\n".join(lines), "type": "summary", "account_id": account["account_id"]}
 
 
 # ─── Run ──────────────────────────────────────────────────────

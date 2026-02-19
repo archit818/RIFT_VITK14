@@ -4,7 +4,7 @@ export default function PatternBreakdown({ summary, accounts }) {
     // Calculate pattern frequency across all accounts
     const patternFreq = {}
         ; (accounts || []).forEach(acc => {
-            (acc.triggered_patterns || []).forEach(p => {
+            (acc.patterns || acc.triggered_patterns || []).forEach(p => {
                 patternFreq[p] = (patternFreq[p] || 0) + 1
             })
         })

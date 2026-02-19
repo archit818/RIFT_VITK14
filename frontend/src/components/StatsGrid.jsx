@@ -14,11 +14,27 @@ export default function StatsGrid({ summary }) {
         },
         {
             value: summary.fraud_rings_detected || 0,
-            label: 'Coordinated Rings',
+            label: 'Validated Rings',
         },
         {
             value: summary.high_risk_accounts || 0,
             label: 'Critical Threats',
+        },
+        {
+            value: `${((summary.estimated_precision || 0) * 100).toFixed(1)}%`,
+            label: 'Est. Precision',
+        },
+        {
+            value: `${((summary.avg_ring_purity || 0) * 100).toFixed(0)}%`,
+            label: 'Ring Purity',
+        },
+        {
+            value: `${((summary.multi_signal_gate_pass_rate || 0) * 100).toFixed(0)}%`,
+            label: 'Multi-Signal Gate',
+        },
+        {
+            value: `${((summary.fp_estimate || 0) * 100).toFixed(1)}%`,
+            label: 'FP Estimate',
         },
         {
             value: summary.processing_time_seconds || 0,

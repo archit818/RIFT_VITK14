@@ -1,8 +1,8 @@
 import { Fragment } from 'react'
 
 function getRiskLevel(score) {
-    if (score >= 70) return 'high'
-    if (score >= 40) return 'medium'
+    if (score >= 80) return 'high'
+    if (score >= 55) return 'medium'
     return 'low'
 }
 
@@ -28,14 +28,19 @@ export default function FraudRings({ rings, compact = false }) {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <div className="font-mono" style={{ fontSize: '0.8rem', fontWeight: 600 }}>{ring.ring_id}</div>
-                                    <div style={{ marginTop: '4px' }}>
+                                    <div style={{ marginTop: '4px', display: 'flex', gap: '6px', alignItems: 'center' }}>
                                         <span className="pattern-tag">{ring.type?.replace(/_/g, ' ')}</span>
+                                        {ring.confidence && (
+                                            <span className={`tier-badge tier-${(ring.confidence || 'low').toLowerCase()}`} style={{ fontSize: '0.5rem' }}>
+                                                {ring.confidence}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
                                     <span className={`risk-badge ${risk}`}>{ring.risk_score?.toFixed(0)}</span>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                                        {ring.node_count} nodes
+                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                                        {ring.node_count} nodes · {((ring.purity || 0) * 100).toFixed(0)}% pure · {((ring.signal_coherence || 0) * 100).toFixed(0)}% coherence
                                     </div>
                                 </div>
                             </div>
@@ -53,8 +58,11 @@ export default function FraudRings({ rings, compact = false }) {
                     <tr>
                         <th style={{ width: '120px' }}>Ring ID</th>
                         <th>Pattern Type</th>
-                        <th style={{ width: '100px' }}>Members</th>
-                        <th style={{ width: '100px' }}>Risk</th>
+                        <th style={{ width: '80px' }}>Members</th>
+                        <th style={{ width: '90px' }}>Risk</th>
+                        <th style={{ width: '70px' }}>Purity</th>
+                        <th style={{ width: '80px' }}>Coherence</th>
+                        <th style={{ width: '90px' }}>Confidence</th>
                         <th>Associated Nodes</th>
                     </tr>
                 </thead>
@@ -87,6 +95,21 @@ export default function FraudRings({ rings, compact = false }) {
                                             {ring.risk_score?.toFixed(0)}
                                         </span>
                                     </div>
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                    <span className="font-mono" style={{ fontSize: '0.7rem', color: ring.purity >= 0.5 ? 'var(--success)' : 'var(--text-muted)' }}>
+                                        {((ring.purity || 0) * 100).toFixed(0)}%
+                                    </span>
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                    <span className="font-mono" style={{ fontSize: '0.7rem', color: (ring.signal_coherence || 0) >= 0.3 ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                        {((ring.signal_coherence || 0) * 100).toFixed(0)}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className={`tier-badge tier-${(ring.confidence || 'low').toLowerCase()}`}>
+                                        {ring.confidence || 'N/A'}
+                                    </span>
                                 </td>
                                 <td>
                                     <div style={{
