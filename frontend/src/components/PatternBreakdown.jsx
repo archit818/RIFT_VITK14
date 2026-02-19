@@ -1,6 +1,5 @@
 export default function PatternBreakdown({ summary, accounts }) {
     const topPatterns = summary.top_patterns || []
-    const detectionModules = summary.detection_modules_triggered || []
 
     // Calculate pattern frequency across all accounts
     const patternFreq = {}
@@ -16,115 +15,81 @@ export default function PatternBreakdown({ summary, accounts }) {
     const maxCount = sortedPatterns.length > 0 ? sortedPatterns[0][1] : 1
 
     const patternDescriptions = {
-        circular_routing: 'Circular fund flows through 3-5 account cycles',
-        fan_in_aggregation: 'Multiple senders funneling into single account',
-        fan_out_dispersal: 'Rapid dispersal to many receivers',
-        shell_chain: 'Fund layering through low-activity intermediaries',
-        transaction_burst: 'Sudden spikes in transaction frequency',
-        rapid_movement: 'Multi-hop transfers within hours',
-        dormant_activation: 'Sudden activation after prolonged inactivity',
-        structuring: 'Repeated near-threshold amounts (smurfing)',
-        amount_consistency_ring: 'Equal transfer amounts in detected cycles',
-        diversity_shift: 'Sudden increase in unique counterparties',
-        centrality_spike: 'Node becoming a sudden network hub',
-        community_suspicion: 'Cluster-level risk propagation',
+        circular_routing: 'Cyclic flows through multi-intermediary nodes',
+        fan_in_aggregation: 'Convergent volume funneling into terminal accounts',
+        fan_out_dispersal: 'Divergent dispersal from central liquidity source',
+        shell_chain: 'Layering through established low-activity proxies',
+        transaction_burst: 'Uncharacteristic temporal volume distribution',
+        rapid_movement: 'Velocity-based hop analysis between counterparties',
+        dormant_activation: 'Systematic activation of legacy/aged accounts',
+        structuring: 'Sub-threshold systematic volume layering',
+        diversity_shift: 'Counterparty breadth deviation from baseline',
+        centrality_spike: 'Structural hub formation in network topology',
     }
 
     return (
-        <div>
-            <h2 className="section-title">
-                Detection Module Analysis
-                <span className="count">{detectionModules.length} active</span>
-            </h2>
+        <div className="fade-up">
+            <h2 className="section-title">Heuristic Correlation Analysis</h2>
 
             <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: '16px',
-                marginBottom: '32px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: '12px',
+                marginBottom: '40px',
             }}>
                 {sortedPatterns.map(([pattern, count], i) => (
-                    <div key={pattern} className={`card fade-up fade-up-delay-${Math.min(i + 1, 4)}`}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                            <div style={{ flex: 1 }}>
-                                <div style={{
-                                    fontWeight: 700,
-                                    fontSize: '0.95rem',
-                                    marginBottom: '4px',
-                                    textTransform: 'capitalize',
-                                }}>
-                                    {pattern.replace(/_/g, ' ')}
-                                </div>
-                                <div style={{
-                                    fontSize: '0.8rem',
-                                    color: 'var(--text-secondary)',
-                                    marginBottom: '8px',
-                                }}>
-                                    {patternDescriptions[pattern] || 'Pattern detection module'}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <div className="risk-bar" style={{ flex: 1 }}>
-                                        <div
-                                            className="risk-bar-fill medium"
-                                            style={{ width: `${(count / maxCount) * 100}%` }}
-                                        />
-                                    </div>
-                                    <span style={{
-                                        fontFamily: 'var(--font-mono)',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 700,
-                                        color: 'var(--accent-secondary)',
-                                        minWidth: '40px',
-                                        textAlign: 'right',
-                                    }}>
-                                        {count}
-                                    </span>
-                                </div>
+                    <div key={pattern} className="card" style={{ padding: '20px', animationDelay: `${i * 0.05}s` }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.7rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+                            {pattern.replace(/_/g, ' ')}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.6, marginBottom: '16px' }}>
+                            {patternDescriptions[pattern] || 'System detection module'}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div className="risk-bar" style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }}>
+                                <div
+                                    className="risk-bar-fill medium"
+                                    style={{ width: `${(count / maxCount) * 100}%`, height: '100%', background: 'var(--text-primary)' }}
+                                />
                             </div>
+                            <span className="font-mono" style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                                {count}
+                            </span>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Module stats from backend */}
             {topPatterns.length > 0 && (
                 <>
-                    <h2 className="section-title">Module Performance</h2>
+                    <h2 className="section-title">Engine Performance Metrics</h2>
                     <div className="table-container">
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Module</th>
-                                    <th>Detections</th>
-                                    <th>Avg Risk</th>
-                                    <th>Impact</th>
+                                    <th>Heuristic</th>
+                                    <th>Instances</th>
+                                    <th>Confidence</th>
+                                    <th>Topology Influence</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {topPatterns.map((tp, i) => (
                                     <tr key={i}>
-                                        <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>
+                                        <td className="font-mono" style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>
                                             {tp.pattern?.replace(/_/g, ' ')}
                                         </td>
+                                        <td className="font-mono">{tp.count}</td>
                                         <td>
-                                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                                                {tp.count}
+                                            <span className="font-mono" style={{ color: 'var(--text-primary)', opacity: 0.8 }}>
+                                                {(tp.avg_risk * 100).toFixed(0)}%
                                             </span>
                                         </td>
                                         <td>
-                                            <span style={{
-                                                fontFamily: 'var(--font-mono)',
-                                                color: tp.avg_risk >= 0.7 ? 'var(--danger)' :
-                                                    tp.avg_risk >= 0.4 ? 'var(--warning)' : 'var(--success)',
-                                            }}>
-                                                {(tp.avg_risk * 100).toFixed(1)}%
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="risk-bar" style={{ width: '80px' }}>
+                                            <div className="risk-bar" style={{ width: '60px', height: '1px' }}>
                                                 <div
                                                     className={`risk-bar-fill ${tp.avg_risk >= 0.7 ? 'high' : tp.avg_risk >= 0.4 ? 'medium' : 'low'}`}
-                                                    style={{ width: `${tp.avg_risk * 100}%` }}
+                                                    style={{ width: `${tp.avg_risk * 100}%`, height: '100%' }}
                                                 />
                                             </div>
                                         </td>
@@ -136,24 +101,12 @@ export default function PatternBreakdown({ summary, accounts }) {
                 </>
             )}
 
-            {/* Suspicious Amount Summary */}
             {summary.total_suspicious_amount > 0 && (
-                <div className="card" style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <div style={{
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        marginBottom: '8px',
-                    }}>
-                        Total Suspicious Flow
+                <div className="card" style={{ marginTop: '40px', padding: '40px', textAlign: 'center', borderStyle: 'dashed' }}>
+                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                        AGGREGATED_EXPOSURE_VALUATION
                     </div>
-                    <div style={{
-                        fontSize: '2.5rem',
-                        fontWeight: 800,
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--danger)',
-                    }}>
+                    <div className="font-mono" style={{ fontSize: '3rem', fontWeight: 200, color: 'var(--text-primary)' }}>
                         ${summary.total_suspicious_amount?.toLocaleString()}
                     </div>
                 </div>

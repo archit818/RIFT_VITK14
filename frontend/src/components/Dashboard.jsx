@@ -24,20 +24,28 @@ export default function Dashboard({ results, apiBase, onReset }) {
     return (
         <div className="dashboard">
             {/* Summary success alert */}
-            <div className="alert alert-success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div className="alert-message">
-                        Analysis complete in <strong>{summary.processing_time_seconds}s</strong>.
-                        Found <strong>{summary.suspicious_accounts_found}</strong> suspicious accounts
-                        and <strong>{summary.fraud_rings_detected}</strong> fraud rings.
+            <div style={{
+                background: 'rgba(0, 255, 153, 0.05)',
+                border: '1px solid rgba(0, 255, 153, 0.1)',
+                borderRadius: '8px',
+                padding: '20px 32px',
+                marginBottom: '48px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ width: '8px', height: '8px', background: 'var(--success)', borderRadius: '50%', boxShadow: '0 0 10px var(--success)' }} />
+                    <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--success)', letterSpacing: '0.05em' }}>
+                        ANALYSIS_COMPLETE: SUCCESSFUL_DETECTION (Nodes: {summary.total_accounts_analyzed})
                     </div>
                 </div>
                 <button
-                    className="btn btn-primary"
+                    className="btn btn-secondary"
                     onClick={handleDownloadJson}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                    style={{ fontSize: '0.65rem', padding: '6px 16px' }}
                 >
-                    Download JSON Report
+                    EXPORT_FORENSIC_REPORT
                 </button>
             </div>
 
@@ -84,7 +92,7 @@ export default function Dashboard({ results, apiBase, onReset }) {
 
                     {results.graph_url && (
                         <div style={{ marginTop: '24px' }}>
-                            <h2 className="section-title">🌐 Network Overview</h2>
+                            <h2 className="section-title">Network Overview</h2>
                             <GraphView url={`${apiBase}${results.graph_url}`} />
                         </div>
                     )}
@@ -94,7 +102,7 @@ export default function Dashboard({ results, apiBase, onReset }) {
             {activeTab === 'accounts' && (
                 <div className="fade-up">
                     <h2 className="section-title">
-                        👤 Suspicious Accounts
+                        Suspicious Accounts
                         <span className="count">{suspicious_accounts.length}</span>
                     </h2>
                     <AccountsTable accounts={suspicious_accounts} />
@@ -104,7 +112,7 @@ export default function Dashboard({ results, apiBase, onReset }) {
             {activeTab === 'rings' && (
                 <div className="fade-up">
                     <h2 className="section-title">
-                        🔗 Fraud Rings
+                        Fraud Rings
                         <span className="count">{fraud_rings.length}</span>
                     </h2>
                     <FraudRings rings={fraud_rings} />
@@ -113,14 +121,13 @@ export default function Dashboard({ results, apiBase, onReset }) {
 
             {activeTab === 'graph' && (
                 <div className="fade-up">
-                    <h2 className="section-title">🌐 Interactive Network Graph</h2>
+                    <h2 className="section-title">Interactive Network Graph</h2>
                     {results.graph_url ? (
                         <GraphView url={`${apiBase}${results.graph_url}`} fullHeight />
                     ) : (
                         <div className="graph-placeholder">
-                            <div className="icon">🌐</div>
                             <h3>No Graph Available</h3>
-                            <p>Graph visualization was not generated for this analysis.</p>
+                            <p>Visualization was not generated for this analysis.</p>
                         </div>
                     )}
                 </div>
@@ -133,16 +140,16 @@ export default function Dashboard({ results, apiBase, onReset }) {
             )}
 
             {/* Footer Actions */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '40px', paddingBottom: '48px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '64px', paddingBottom: '64px' }}>
                 <button className="btn btn-secondary" onClick={onReset} id="new-analysis-btn">
-                    Start New Analysis
+                    TERMINATE_SESSION
                 </button>
                 <button
                     className="btn btn-primary"
                     onClick={handleDownloadJson}
                     id="download-json-btn"
                 >
-                    Download JSON Report
+                    GENERATE_FULL_REPORT
                 </button>
             </div>
         </div>

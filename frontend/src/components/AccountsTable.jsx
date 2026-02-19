@@ -1,15 +1,9 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 
 function getRiskLevel(score) {
     if (score >= 70) return 'high'
     if (score >= 40) return 'medium'
     return 'low'
-}
-
-function getRiskLabel(score) {
-    if (score >= 70) return 'HIGH'
-    if (score >= 40) return 'MEDIUM'
-    return 'LOW'
 }
 
 export default function AccountsTable({ accounts, compact = false }) {
@@ -29,8 +23,8 @@ export default function AccountsTable({ accounts, compact = false }) {
     }
 
     return (
-        <div>
-            <div className="table-container" style={{ maxHeight: compact ? '400px' : '600px', overflowY: 'auto' }}>
+        <div className="fade-up">
+            <div className="table-container">
                 <table className="table" id="accounts-table">
                     <thead>
                         <tr>
@@ -39,7 +33,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                             <th>Risk Score</th>
                             <th>Patterns</th>
                             <th>Rings</th>
-                            {!compact && <th>Details</th>}
+                            {!compact && <th>Action</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -48,34 +42,33 @@ export default function AccountsTable({ accounts, compact = false }) {
                             const isExpanded = expandedRow === account.account_id
 
                             return (
-                                <>
+                                <Fragment key={account.account_id}>
                                     <tr
-                                        key={account.account_id}
                                         onClick={() => setExpandedRow(isExpanded ? null : account.account_id)}
                                         style={{ cursor: 'pointer' }}
                                         id={`account-row-${account.account_id}`}
                                     >
-                                        <td style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                                        <td className="font-mono" style={{ opacity: 0.5 }}>
                                             {page * pageSize + i + 1}
                                         </td>
-                                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                                        <td className="font-mono" style={{ color: 'var(--text-primary)' }}>
                                             {account.account_id}
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <span className={`risk-badge ${risk}`}>
-                                                    {getRiskLabel(account.risk_score)} {account.risk_score.toFixed(1)}
+                                                    {account.risk_score.toFixed(0)}
                                                 </span>
-                                                <div className="risk-bar" style={{ width: '60px' }}>
+                                                <div className="risk-bar" style={{ width: '40px', height: '2px', background: 'rgba(255,255,255,0.05)' }}>
                                                     <div
                                                         className={`risk-bar-fill ${risk}`}
-                                                        style={{ width: `${account.risk_score}%` }}
+                                                        style={{ width: `${account.risk_score}%`, height: '100%' }}
                                                     />
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                                 {(account.triggered_patterns || []).slice(0, compact ? 2 : 5).map((p, j) => (
                                                     <span key={j} className="pattern-tag">{p.replace(/_/g, ' ')}</span>
                                                 ))}
@@ -84,58 +77,55 @@ export default function AccountsTable({ accounts, compact = false }) {
                                                 )}
                                             </div>
                                         </td>
-                                        <td>
+                                        <td className="font-mono">
                                             {(account.ring_ids || []).length > 0 ? (
-                                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--accent-secondary)' }}>
-                                                    {account.ring_ids.slice(0, 2).join(', ')}
+                                                <span style={{ opacity: 0.8 }}>
+                                                    {account.ring_ids.slice(0, 1).join(', ')}
                                                 </span>
                                             ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
+                                                <span style={{ opacity: 0.3 }}>—</span>
                                             )}
                                         </td>
                                         {!compact && (
                                             <td>
-                                                <button
-                                                    className="btn btn-secondary"
-                                                    style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setExpandedRow(isExpanded ? null : account.account_id)
-                                                    }}
-                                                >
-                                                    {isExpanded ? 'Hide' : 'View'}
+                                                <button className="btn" style={{ padding: '4px 12px', fontSize: '0.7rem' }}>
+                                                    {isExpanded ? 'Hide' : 'Details'}
                                                 </button>
                                             </td>
                                         )}
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${account.account_id}-detail`}>
-                                            <td colSpan={compact ? 5 : 6} style={{ padding: '0 16px 16px' }}>
-                                                <div style={{ background: 'var(--bg-tertiary)', borderRadius: '10px', padding: '16px' }}>
-                                                    <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '0.9rem' }}>
-                                                        Explanation
+                                            <td colSpan={compact ? 5 : 6} style={{ padding: '0 24px 24px' }}>
+                                                <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '8px', padding: '24px', border: '1px solid var(--border)' }}>
+                                                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                                                        Forensic Explanation
                                                     </div>
-                                                    {(account.explanations || []).map((exp, j) => (
-                                                        <div key={j} className="explanation" style={{ marginBottom: '4px' }}>
-                                                            {exp}
-                                                        </div>
-                                                    ))}
-                                                    {account.score_breakdown && (
-                                                        <div style={{ marginTop: '12px' }}>
-                                                            <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px' }}>
-                                                                Score Breakdown
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {(account.explanations || []).map((exp, j) => (
+                                                            <div key={j} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                {exp}
                                                             </div>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '4px' }}>
+                                                        ))}
+                                                    </div>
+
+                                                    {account.score_breakdown && (
+                                                        <div style={{ marginTop: '24px' }}>
+                                                            <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                                                                Detection Metrics
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px' }}>
                                                                 {account.score_breakdown.map((sb, j) => (
                                                                     <div key={j} style={{
-                                                                        fontSize: '0.75rem',
+                                                                        fontSize: '0.7rem',
                                                                         fontFamily: 'var(--font-mono)',
                                                                         color: 'var(--text-secondary)',
-                                                                        padding: '4px 8px',
-                                                                        background: 'var(--bg-card)',
+                                                                        padding: '8px 12px',
+                                                                        background: 'rgba(255,255,255,0.02)',
                                                                         borderRadius: '4px',
+                                                                        border: '1px solid var(--border)'
                                                                     }}>
-                                                                        {sb.module}: {(sb.weighted * 100).toFixed(1)}%
+                                                                        {sb.module}: {(sb.weighted * 100).toFixed(0)}%
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -145,7 +135,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                                             </td>
                                         </tr>
                                     )}
-                                </>
+                                </Fragment>
                             )
                         })}
                     </tbody>
@@ -153,27 +143,27 @@ export default function AccountsTable({ accounts, compact = false }) {
             </div>
 
             {!compact && totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '32px' }}>
                     <button
-                        className="btn btn-secondary"
+                        className="btn"
                         onClick={() => setPage(Math.max(0, page - 1))}
                         disabled={page === 0}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                     >
-                        Previous
+                        Prev
                     </button>
                     <span style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-muted)',
                         padding: '4px 12px',
                         display: 'flex',
                         alignItems: 'center',
                     }}>
-                        {page + 1} / {totalPages}
+                        {page + 1} of {totalPages}
                     </span>
                     <button
-                        className="btn btn-secondary"
+                        className="btn"
                         onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                         disabled={page >= totalPages - 1}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}

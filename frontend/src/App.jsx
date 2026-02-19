@@ -82,7 +82,24 @@ function App() {
 
   return (
     <>
-      <div className="app-bg" />
+      <div className="app-bg">
+        <div className="bg-particles">
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((i) => (
+            <div
+              key={i}
+              className="particle"
+              style={{
+                left: `${(i * 7.3) % 100}%`,
+                top: `${(i * 13.7) % 100}%`,
+                width: `${(i % 3) + 1}px`,
+                height: `${(i % 3) + 1}px`,
+                animationDuration: `${(i % 10) + 15}s`,
+                animationDelay: `${(i % 5)}s`
+              }}
+            />
+          ))}
+        </div>
+      </div>
       <div className="app-container">
         <Header onReset={handleReset} hasResults={!!results} />
 
