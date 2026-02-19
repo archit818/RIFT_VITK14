@@ -43,7 +43,6 @@ export default function UploadZone({ onUpload, onGenerateTestData }) {
                 onClick={() => fileInputRef.current?.click()}
                 id="upload-zone"
             >
-                <span className="upload-icon">🔍</span>
                 <div className="upload-title">Upload Transaction Data</div>
                 <div className="upload-subtitle">
                     Drag & drop your CSV file here, or click to browse
@@ -76,7 +75,7 @@ export default function UploadZone({ onUpload, onGenerateTestData }) {
                     }}
                     id="generate-test-data-btn"
                 >
-                    🧪 Generate & Analyze Test Data
+                    Generate & Analyze Test Data
                 </button>
             </div>
 
@@ -88,13 +87,12 @@ export default function UploadZone({ onUpload, onGenerateTestData }) {
                 textAlign: 'center'
             }}>
                 {[
-                    { icon: '🔄', title: 'Cycle Detection', desc: 'Find circular money flows' },
-                    { icon: '📊', title: '12 Modules', desc: 'Comprehensive pattern analysis' },
-                    { icon: '🎯', title: 'Precision Tuned', desc: 'Low false positive rate' },
-                    { icon: '⚡', title: 'Fast Analysis', desc: '≤ 30s for 10K transactions' },
+                    { title: 'Cycle Detection', desc: 'Find circular money flows' },
+                    { title: 'Detection Modules', desc: 'Comprehensive pattern analysis' },
+                    { title: 'Forensic Precision', desc: 'Low false positive rate' },
+                    { title: 'Performance', desc: 'Optimized for large datasets' },
                 ].map((feature, i) => (
                     <div key={i} className={`card fade-up fade-up-delay-${i + 1}`} style={{ textAlign: 'center', padding: '20px' }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{feature.icon}</div>
                         <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '4px' }}>{feature.title}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{feature.desc}</div>
                     </div>

@@ -30,25 +30,10 @@ export default function PatternBreakdown({ summary, accounts }) {
         community_suspicion: 'Cluster-level risk propagation',
     }
 
-    const patternIcons = {
-        circular_routing: '🔄',
-        fan_in_aggregation: '📥',
-        fan_out_dispersal: '📤',
-        shell_chain: '🐚',
-        transaction_burst: '💥',
-        rapid_movement: '⚡',
-        dormant_activation: '😴',
-        structuring: '📐',
-        amount_consistency_ring: '💰',
-        diversity_shift: '🔀',
-        centrality_spike: '📍',
-        community_suspicion: '👥',
-    }
-
     return (
         <div>
             <h2 className="section-title">
-                🧩 Detection Module Analysis
+                Detection Module Analysis
                 <span className="count">{detectionModules.length} active</span>
             </h2>
 
@@ -61,9 +46,6 @@ export default function PatternBreakdown({ summary, accounts }) {
                 {sortedPatterns.map(([pattern, count], i) => (
                     <div key={pattern} className={`card fade-up fade-up-delay-${Math.min(i + 1, 4)}`}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                            <div style={{ fontSize: '2rem' }}>
-                                {patternIcons[pattern] || '🔍'}
-                            </div>
                             <div style={{ flex: 1 }}>
                                 <div style={{
                                     fontWeight: 700,
@@ -107,7 +89,7 @@ export default function PatternBreakdown({ summary, accounts }) {
             {/* Module stats from backend */}
             {topPatterns.length > 0 && (
                 <>
-                    <h2 className="section-title">📈 Module Performance</h2>
+                    <h2 className="section-title">Module Performance</h2>
                     <div className="table-container">
                         <table className="table">
                             <thead>
@@ -122,7 +104,7 @@ export default function PatternBreakdown({ summary, accounts }) {
                                 {topPatterns.map((tp, i) => (
                                     <tr key={i}>
                                         <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>
-                                            {patternIcons[tp.pattern] || '🔍'} {tp.pattern?.replace(/_/g, ' ')}
+                                            {tp.pattern?.replace(/_/g, ' ')}
                                         </td>
                                         <td>
                                             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>

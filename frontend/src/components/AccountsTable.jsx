@@ -22,7 +22,6 @@ export default function AccountsTable({ accounts, compact = false }) {
     if (!accounts.length) {
         return (
             <div className="empty-state">
-                <div className="icon">✅</div>
                 <h3>No Suspicious Accounts</h3>
                 <p>No accounts were flagged by the detection modules.</p>
             </div>
@@ -114,7 +113,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                                             <td colSpan={compact ? 5 : 6} style={{ padding: '0 16px 16px' }}>
                                                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: '10px', padding: '16px' }}>
                                                     <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '0.9rem' }}>
-                                                        🔍 Explanation
+                                                        Explanation
                                                     </div>
                                                     {(account.explanations || []).map((exp, j) => (
                                                         <div key={j} className="explanation" style={{ marginBottom: '4px' }}>
@@ -161,7 +160,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                         disabled={page === 0}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                     >
-                        ← Previous
+                        Previous
                     </button>
                     <span style={{
                         fontFamily: 'var(--font-mono)',
@@ -179,7 +178,7 @@ export default function AccountsTable({ accounts, compact = false }) {
                         disabled={page >= totalPages - 1}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                     >
-                        Next →
+                        Next
                     </button>
                 </div>
             )}

@@ -6,11 +6,11 @@ import GraphView from './GraphView'
 import PatternBreakdown from './PatternBreakdown'
 
 const TABS = [
-    { id: 'overview', label: '📊 Overview', icon: '📊' },
-    { id: 'accounts', label: '👤 Suspicious Accounts', icon: '👤' },
-    { id: 'rings', label: '🔗 Fraud Rings', icon: '🔗' },
-    { id: 'graph', label: '🌐 Network Graph', icon: '🌐' },
-    { id: 'patterns', label: '🧩 Patterns', icon: '🧩' },
+    { id: 'overview', label: 'Overview' },
+    { id: 'accounts', label: 'Suspicious Accounts' },
+    { id: 'rings', label: 'Fraud Rings' },
+    { id: 'graph', label: 'Network Graph' },
+    { id: 'patterns', label: 'Patterns' },
 ]
 
 export default function Dashboard({ results, apiBase, onReset }) {
@@ -26,7 +26,6 @@ export default function Dashboard({ results, apiBase, onReset }) {
             {/* Summary success alert */}
             <div className="alert alert-success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span className="alert-icon">✅</span>
                     <div className="alert-message">
                         Analysis complete in <strong>{summary.processing_time_seconds}s</strong>.
                         Found <strong>{summary.suspicious_accounts_found}</strong> suspicious accounts
@@ -36,9 +35,9 @@ export default function Dashboard({ results, apiBase, onReset }) {
                 <button
                     className="btn btn-primary"
                     onClick={handleDownloadJson}
-                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }}
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
                 >
-                    📥 Download JSON Report
+                    Download JSON Report
                 </button>
             </div>
 
@@ -66,7 +65,7 @@ export default function Dashboard({ results, apiBase, onReset }) {
                     <div className="two-col" style={{ marginTop: '24px' }}>
                         <div>
                             <h2 className="section-title">
-                                🔥 Top Threats
+                                Top Threats
                                 <span className="count">{Math.min(5, suspicious_accounts.length)}</span>
                             </h2>
                             <AccountsTable
@@ -76,7 +75,7 @@ export default function Dashboard({ results, apiBase, onReset }) {
                         </div>
                         <div>
                             <h2 className="section-title">
-                                🔗 Active Rings
+                                Active Rings
                                 <span className="count">{Math.min(5, fraud_rings.length)}</span>
                             </h2>
                             <FraudRings rings={fraud_rings.slice(0, 5)} compact />
@@ -136,14 +135,14 @@ export default function Dashboard({ results, apiBase, onReset }) {
             {/* Footer Actions */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '40px', paddingBottom: '48px' }}>
                 <button className="btn btn-secondary" onClick={onReset} id="new-analysis-btn">
-                    ← Start New Analysis
+                    Start New Analysis
                 </button>
                 <button
                     className="btn btn-primary"
                     onClick={handleDownloadJson}
                     id="download-json-btn"
                 >
-                    📥 Download JSON Report
+                    Download JSON Report
                 </button>
             </div>
         </div>

@@ -5,35 +5,39 @@
 
 /* ─── CSS Custom Properties ─────────────────────────────── */
 :root {
-  /* Colors */
-  --bg-primary: #06060e;
-  --bg-secondary: #0a0a1a;
-  --bg-tertiary: #0f0f24;
-  --bg-card: #12122a;
-  --bg-card-hover: #1a1a3a;
-  --bg-elevated: #16163a;
+  /* Premium Obsidian Palette */
+  --bg-primary: #030307;
+  --bg-secondary: #08080f;
+  --bg-tertiary: #0c0c16;
+  --bg-card: #0d0d1a;
+  --bg-card-hover: #121226;
+  --bg-elevated: #15152b;
 
-  --accent-primary: #6c5ce7;
-  --accent-secondary: #a29bfe;
-  --accent-glow: rgba(108, 92, 231, 0.3);
+  /* Sophisticated Accents */
+  --accent-primary: #4e44ce;
+  --accent-secondary: #7d73f3;
+  --accent-glow: rgba(78, 68, 206, 0.15);
 
-  --danger: #ff1744;
-  --danger-soft: rgba(255, 23, 68, 0.15);
-  --warning: #ff9100;
-  --warning-soft: rgba(255, 145, 0, 0.15);
-  --success: #00e676;
-  --success-soft: rgba(0, 230, 118, 0.15);
-  --info: #00e5ff;
-  --info-soft: rgba(0, 229, 255, 0.15);
+  /* Functional Colors */
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.08);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.08);
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.08);
+  --info: #06b6d4;
+  --info-soft: rgba(6, 182, 212, 0.08);
 
-  --text-primary: #eeeeff;
-  --text-secondary: #8888bb;
-  --text-muted: #555588;
-  --text-accent: #a29bfe;
+  /* Refined Typography */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --text-accent: #818cf8;
 
-  --border: #222244;
-  --border-hover: #333366;
-  --border-active: #6c5ce7;
+  /* Ultra-minimal Borders */
+  --border: #1e293b;
+  --border-hover: #334155;
+  --border-active: #4e44ce;
 
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -49,21 +53,21 @@
   --space-3xl: 64px;
 
   /* Radii */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 30px var(--accent-glow);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 20px var(--accent-glow);
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 400ms ease;
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── Global Reset & Base ───────────────────────────────── */

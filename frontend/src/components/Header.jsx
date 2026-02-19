@@ -11,7 +11,7 @@ export default function Header({ onReset, hasResults }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {hasResults && (
                     <button className="btn btn-secondary" onClick={onReset}>
-                        ← New Analysis
+                        New Analysis
                     </button>
                 )}
                 <div className="header-status">

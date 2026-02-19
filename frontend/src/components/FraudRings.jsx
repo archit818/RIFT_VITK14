@@ -10,7 +10,6 @@ export default function FraudRings({ rings, compact = false }) {
     if (!rings.length) {
         return (
             <div className="empty-state">
-                <div className="icon">🔗</div>
                 <h3>No Fraud Rings Detected</h3>
                 <p>No coordinated fraud ring patterns were identified.</p>
             </div>
