@@ -17,63 +17,78 @@ export default function FraudRings({ rings, compact = false }) {
         )
     }
 
+    if (compact) {
+        return (
+            <div>
+                {displayRings.map((ring) => {
+                    const risk = getRiskLevel(ring.risk_score)
+                    return (
+                        <div key={ring.ring_id} className="ring-card" id={`ring-${ring.ring_id}`}>
+                            <div className="ring-header">
+                                <div>
+                                    <div className="ring-id">{ring.ring_id}</div>
+                                    <div className="pattern-tags">
+                                        <span className="pattern-tag">{ring.type?.replace(/_/g, ' ')}</span>
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <span className={`risk-badge ${risk}`}>{ring.risk_score?.toFixed(1)}</span>
+                                    <div className="ring-meta">{ring.node_count} nodes</div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
+
     return (
-        <div>
-            {displayRings.map((ring, i) => {
-                const risk = getRiskLevel(ring.risk_score)
-                return (
-                    <div key={ring.ring_id} className="ring-card" id={`ring-${ring.ring_id}`}>
-                        <div className="ring-header">
-                            <div>
-                                <div className="ring-id">{ring.ring_id}</div>
-                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                    <span className="pattern-tag">{ring.type?.replace(/_/g, ' ')}</span>
-                                    {(ring.patterns || []).map((p, j) => (
-                                        <span key={j} className="pattern-tag">{p.replace(/_/g, ' ')}</span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                                <span className={`risk-badge ${risk}`}>
-                                    {ring.risk_score?.toFixed(1)}
-                                </span>
-                                <div style={{
-                                    marginTop: '4px',
-                                    fontSize: '0.75rem',
-                                    fontFamily: 'var(--font-mono)',
-                                    color: 'var(--text-secondary)',
-                                }}>
-                                    {ring.node_count} nodes · ${ring.total_amount?.toLocaleString()}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="risk-bar" style={{ marginBottom: '8px' }}>
-                            <div
-                                className={`risk-bar-fill ${risk}`}
-                                style={{ width: `${ring.risk_score}%` }}
-                            />
-                        </div>
-
-                        {!compact && (ring.explanations || []).length > 0 && (
-                            <div className="explanation">
-                                {ring.explanations[0]}
-                            </div>
-                        )}
-
-                        <div className="ring-nodes">
-                            {(ring.nodes || []).slice(0, compact ? 6 : 20).map((node, j) => (
-                                <span key={j} className="ring-node">{node}</span>
-                            ))}
-                            {(ring.nodes || []).length > (compact ? 6 : 20) && (
-                                <span className="ring-node" style={{ color: 'var(--text-muted)' }}>
-                                    +{ring.nodes.length - (compact ? 6 : 20)} more
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                )
-            })}
+        <div className="table-container fade-up">
+            <table className="data-table">
+                <thead>
+                    <tr>
+                        <th style={{ width: '100px' }}>Ring ID</th>
+                        <th style={{ width: '150px' }}>Pattern Type</th>
+                        <th style={{ width: '100px' }}>Member Count</th>
+                        <th style={{ width: '100px' }}>Risk Score</th>
+                        <th>Member Account IDs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {displayRings.map((ring) => {
+                        const risk = getRiskLevel(ring.risk_score)
+                        return (
+                            <tr key={ring.ring_id} className="table-row">
+                                <td className="font-mono" style={{ fontWeight: 'bold' }}>{ring.ring_id}</td>
+                                <td>
+                                    <span className="pattern-tag">
+                                        {ring.type?.replace(/_/g, ' ')}
+                                    </span>
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                    <div className="member-count-badge">
+                                        {ring.node_count}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div className="risk-dot" style={{ backgroundColor: `var(--${risk})` }}></div>
+                                        <span style={{ fontWeight: 600, color: `var(--${risk})` }}>
+                                            {ring.risk_score?.toFixed(1)}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="account-list-scroll">
+                                        {(ring.nodes || []).join(', ')}
+                                    </div>
+                                </td>
+                            </tr>
+                        )
+                    })}
+                </tbody>
+            </table>
         </div>
     )
 }
