@@ -17,17 +17,29 @@ export default function Dashboard({ results, apiBase, onReset }) {
     const [activeTab, setActiveTab] = useState('overview')
     const { suspicious_accounts = [], fraud_rings = [], summary = {} } = results || {}
 
+    const handleDownloadJson = () => {
+        window.location.href = `${apiBase}/api/export-json`;
+    };
+
     return (
         <div className="dashboard">
             {/* Summary success alert */}
-            <div className="alert alert-success">
-                <span className="alert-icon">✅</span>
-                <div className="alert-message">
-                    Analysis complete in <strong>{summary.processing_time_seconds}s</strong>.
-                    Found <strong>{summary.suspicious_accounts_found}</strong> suspicious accounts
-                    and <strong>{summary.fraud_rings_detected}</strong> fraud rings
-                    across <strong>{summary.total_transactions_analyzed?.toLocaleString()}</strong> transactions.
+            <div className="alert alert-success" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="alert-icon">✅</span>
+                    <div className="alert-message">
+                        Analysis complete in <strong>{summary.processing_time_seconds}s</strong>.
+                        Found <strong>{summary.suspicious_accounts_found}</strong> suspicious accounts
+                        and <strong>{summary.fraud_rings_detected}</strong> fraud rings.
+                    </div>
                 </div>
+                <button
+                    className="btn btn-primary"
+                    onClick={handleDownloadJson}
+                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }}
+                >
+                    📥 Download JSON Report
+                </button>
             </div>
 
             {/* Tabs */}
@@ -121,12 +133,20 @@ export default function Dashboard({ results, apiBase, onReset }) {
                 </div>
             )}
 
-            {/* New Analysis Button */}
-            <div style={{ textAlign: 'center', marginTop: '32px', paddingBottom: '48px' }}>
-                <button className="btn btn-primary" onClick={onReset} id="new-analysis-btn">
+            {/* Footer Actions */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '40px', paddingBottom: '48px' }}>
+                <button className="btn btn-secondary" onClick={onReset} id="new-analysis-btn">
                     ← Start New Analysis
+                </button>
+                <button
+                    className="btn btn-primary"
+                    onClick={handleDownloadJson}
+                    id="download-json-btn"
+                >
+                    📥 Download JSON Report
                 </button>
             </div>
         </div>
-    )
+    );
 }
+

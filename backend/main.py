@@ -574,6 +574,50 @@ async def simulate_fraud(
 
 # ─── Documentation Endpoint ───────────────────────────────────
 
+@app.get("/api/export-json")
+async def export_json_report():
+    """
+    Download a JSON file of the analysis in the EXACT format requested.
+    """
+    if "latest" not in analysis_cache:
+        raise HTTPException(status_code=404, detail="No analysis results available. Run analysis first.")
+
+    latest = analysis_cache["latest"]
+
+    # Transform to the EXACT format requested
+    exported_data = {
+        "suspicious_accounts": [
+            {
+                "account_id": acc["account_id"],
+                "suspicion_score": acc["risk_score"],
+                "detected_patterns": acc["triggered_patterns"],
+                "ring_id": acc["ring_ids"][0] if acc["ring_ids"] else "NONE"
+            }
+            for acc in latest["suspicious_accounts"]
+        ],
+        "fraud_rings": [
+            {
+                "ring_id": ring["ring_id"],
+                "member_accounts": ring["nodes"],
+                "pattern_type": ring["type"],
+                "risk_score": ring["risk_score"]
+            }
+            for ring in latest["fraud_rings"]
+        ],
+        "summary": {
+            "total_accounts_analyzed": latest["summary"]["total_accounts_analyzed"],
+            "suspicious_accounts_flagged": latest["summary"]["suspicious_accounts_found"],
+            "fraud_rings_detected": latest["summary"]["fraud_rings_detected"],
+            "processing_time_seconds": latest["summary"]["processing_time_seconds"]
+        }
+    }
+
+    return JSONResponse(
+        content=exported_data,
+        headers={"Content-Disposition": "attachment; filename=rift_report.json"}
+    )
+
+
 @app.get("/api/docs/architecture")
 async def get_architecture():
     """Return system architecture documentation."""
