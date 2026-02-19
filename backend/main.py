@@ -2,7 +2,15 @@
 RIFT - Financial Forensics Engine
 FastAPI Backend - Main Application
 
-Provides REST API for CSV upload, analysis, and visualization.
+Detection Pipeline (waterfall priority):
+  1. Compute legitimacy scores → exclude legitimate nodes
+  2. Cycle detection (highest priority rings)
+  3. Fan-in + Fan-out → combined fan_in_fan_out rings
+  4. Shell chain detection → layered_chain rings
+  5. Community detection (lowest priority, only remaining nodes)
+  6. Parallel: burst, rapid movement, dormant, structuring, diversity shift, centrality spike
+  7. Amount consistency on detected cycles
+  8. Scoring (ring manager + legitimacy aware)
 """
 
 import os
@@ -12,7 +20,7 @@ import json
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Set
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
@@ -23,6 +31,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 from validators import validate_csv
 from graph_engine import TransactionGraph
+from legitimacy import filter_legitimate_accounts
+from ring_manager import RingManager
 from scoring import compute_scores
 from visualization import generate_visualization
 from synthetic import generate_synthetic_data, generate_edge_case_data
@@ -48,7 +58,7 @@ from detectors.advanced import (
 app = FastAPI(
     title="RIFT - Financial Forensics Engine",
     description="Detect money muling networks using graph analytics and temporal intelligence.",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 # CORS for React frontend
@@ -79,7 +89,7 @@ analysis_cache = {}
 async def root():
     return {
         "name": "RIFT - Financial Forensics Engine",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
     }
@@ -96,17 +106,17 @@ async def health():
 async def analyze_transactions(file: UploadFile = File(...)):
     """
     Main analysis endpoint.
-    Accepts CSV upload, runs all detection modules, returns structured results.
+    Accepts CSV upload, runs all detection modules with priority pipeline,
+    returns structured results.
     """
     start_time = time.time()
-    
+
     # --- Read and validate ---
     try:
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Empty file uploaded.")
-        
-        # Try multiple encodings
+
         df = None
         for encoding in ["utf-8", "latin-1", "cp1252"]:
             try:
@@ -114,21 +124,21 @@ async def analyze_transactions(file: UploadFile = File(...)):
                 break
             except Exception:
                 continue
-        
+
         if df is None:
             raise HTTPException(status_code=400, detail="Could not parse CSV file.")
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
-    
+
     # Validate
     df_clean, validation_errors = validate_csv(df)
-    
-    critical_errors = [e for e in validation_errors if e.get("error_type") in 
+
+    critical_errors = [e for e in validation_errors if e.get("error_type") in
                        ("MISSING_COLUMNS", "EMPTY_FILE", "ALL_ROWS_INVALID")]
-    
+
     if critical_errors:
         return JSONResponse(
             status_code=400,
@@ -138,10 +148,10 @@ async def analyze_transactions(file: UploadFile = File(...)):
                 "warnings": [e for e in validation_errors if e not in critical_errors],
             }
         )
-    
+
     if df_clean.empty:
         raise HTTPException(status_code=400, detail="No valid transactions after validation.")
-    
+
     # --- Build Graph ---
     try:
         tg = TransactionGraph(df_clean)
@@ -150,27 +160,31 @@ async def analyze_transactions(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Graph construction failed: {str(e)}"
         )
-    
-    # --- Run Detection Modules ---
+
+    # --- Run Detection Pipeline ---
     try:
-        all_detections = await _run_detections(tg)
+        all_detections, ring_manager, legit_set, legit_scores = await _run_detection_pipeline(tg)
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Detection failed: {str(e)}"
         )
-    
+
     # --- Compute Scores ---
     try:
-        suspicious_accounts, fraud_rings, summary = compute_scores(tg, all_detections)
+        suspicious_accounts, fraud_rings, summary = compute_scores(
+            tg, all_detections, ring_manager,
+            legitimate_accounts=legit_set,
+            legitimacy_scores=legit_scores,
+        )
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Scoring failed: {str(e)}"
         )
-    
+
     # --- Generate Visualization ---
     try:
         graph_path = generate_visualization(
@@ -179,65 +193,279 @@ async def analyze_transactions(file: UploadFile = File(...)):
     except Exception as e:
         traceback.print_exc()
         graph_path = None
-    
+
     elapsed = round(time.time() - start_time, 2)
-    
+
     # --- Build Response ---
     summary["processing_time_seconds"] = elapsed
     summary["validation_warnings"] = [
         e for e in validation_errors if e.get("error_type") not in
         ("MISSING_COLUMNS", "EMPTY_FILE", "ALL_ROWS_INVALID")
     ]
-    
+
     response = {
         "suspicious_accounts": suspicious_accounts[:200],
         "fraud_rings": fraud_rings[:100],
         "summary": summary,
         "graph_url": "/static/graph.html" if graph_path else None,
     }
-    
+
     # Cache the result
     analysis_cache["latest"] = response
-    
+
     return response
 
 
-async def _run_detections(tg: TransactionGraph) -> dict:
-    """Run all detection modules, using thread pool for parallelism."""
+async def _run_detection_pipeline(tg: TransactionGraph):
+    """
+    Run detection modules in priority waterfall order.
+
+    Pipeline:
+      Step 0: Legitimacy filter (exclude merchants/payroll)
+      Step 1: Cycle detection → assign to rings (priority 1)
+      Step 2: Fan-in + Fan-out → detect combined mule hubs → assign to rings (priority 2)
+      Step 3: Shell chain detection → assign to rings (priority 3)
+      Step 4: Community detection on remaining nodes → assign to rings (priority 4)
+      Step 5: Parallel detection modules (burst, rapid, dormant, structuring, etc.)
+      Step 6: Amount consistency on cycles
+    """
     loop = asyncio.get_event_loop()
-    
-    # Run detection modules in parallel
-    futures = {
-        "circular_routing": loop.run_in_executor(executor, detect_circular_routing, tg),
-        "fan_in_aggregation": loop.run_in_executor(executor, detect_fan_in, tg),
-        "fan_out_dispersal": loop.run_in_executor(executor, detect_fan_out, tg),
-        "shell_chain": loop.run_in_executor(executor, detect_shell_chains, tg),
-        "transaction_burst": loop.run_in_executor(executor, detect_transaction_bursts, tg),
-        "rapid_movement": loop.run_in_executor(executor, detect_rapid_movement, tg),
-        "dormant_activation": loop.run_in_executor(executor, detect_dormant_activation, tg),
-        "structuring": loop.run_in_executor(executor, detect_structuring, tg),
-        "diversity_shift": loop.run_in_executor(executor, detect_diversity_shift, tg),
-        "centrality_spike": loop.run_in_executor(executor, detect_centrality_spike, tg),
-        "community_suspicion": loop.run_in_executor(executor, detect_community_suspicion, tg),
+    ring_mgr = RingManager()
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 0: Legitimacy filter
+    # ──────────────────────────────────────────────────────────
+    legit_set, legit_scores = filter_legitimate_accounts(tg, threshold=0.70)
+    print(f"[PIPELINE] Legitimate accounts excluded: {len(legit_set)} / {tg.node_count}")
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 1: Cycle detection (HIGHEST PRIORITY)
+    # ──────────────────────────────────────────────────────────
+    cycles = await loop.run_in_executor(executor, detect_circular_routing, tg)
+
+    # Filter: exclude cycles containing legitimate accounts
+    filtered_cycles = []
+    for cyc in cycles:
+        nodes = cyc.get("nodes", [])
+        # If any node is legitimate, skip this cycle
+        if any(str(n) in legit_set for n in nodes):
+            continue
+        filtered_cycles.append(cyc)
+
+    # Register cycle rings (priority 1)
+    for cyc in filtered_cycles:
+        ring_mgr.add_ring(
+            pattern_type="cycle",
+            nodes=cyc["nodes"],
+            risk_score=cyc.get("risk_score", 0.5) * 100,
+            total_amount=cyc.get("total_amount", 0),
+            explanation=cyc.get("explanation", ""),
+        )
+
+    print(f"[PIPELINE] Cycles: {len(filtered_cycles)} detected, "
+          f"rings: {len(ring_mgr.rings)}, "
+          f"accounts in rings: {len(ring_mgr.get_assigned_accounts())}")
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 2: Fan-in + Fan-out → combined fan_in_fan_out
+    # ──────────────────────────────────────────────────────────
+    fan_in_results = await loop.run_in_executor(
+        executor, lambda: detect_fan_in(tg, threshold_senders=3, exclude_nodes=legit_set)
+    )
+    fan_out_results = await loop.run_in_executor(
+        executor, lambda: detect_fan_out(tg, threshold_receivers=3, exclude_nodes=legit_set)
+    )
+
+    # Find combined fan_in_fan_out hubs:
+    # An account that has BOTH fan-in AND fan-out activity = mule hub
+    fan_in_hubs = {d["account_id"]: d for d in fan_in_results}
+    fan_out_hubs = {d["account_id"]: d for d in fan_out_results}
+
+    combined_hubs = set(fan_in_hubs.keys()) & set(fan_out_hubs.keys())
+    fan_in_fan_out_results = []
+
+    for hub_id in combined_hubs:
+        if hub_id in legit_set:
+            continue
+        fi = fan_in_hubs[hub_id]
+        fo = fan_out_hubs[hub_id]
+
+        # Build ring: hub + all senders + all receivers
+        all_nodes = set([hub_id])
+        senders = set(fi.get("senders", []))
+        receivers = set(fo.get("receivers", []))
+        # Remove legitimate from the ring
+        senders -= legit_set
+        receivers -= legit_set
+        all_nodes |= senders | receivers
+
+        total_amount = fi.get("total_amount", 0) + fo.get("total_amount", 0)
+        combined_risk = max(fi.get("risk_score", 0), fo.get("risk_score", 0))
+
+        detection = {
+            "account_id": hub_id,
+            "type": "fan_in_fan_out",
+            "nodes": list(all_nodes),
+            "senders": list(senders),
+            "receivers": list(receivers),
+            "fan_in_count": fi.get("sender_count", 0),
+            "fan_out_count": fo.get("receiver_count", 0),
+            "total_amount": round(total_amount, 2),
+            "risk_score": combined_risk,
+            "explanation": (
+                f"Mule hub {hub_id}: {fi.get('sender_count', 0)} senders → "
+                f"{fo.get('receiver_count', 0)} receivers. "
+                f"Total flow: ${total_amount:,.2f}."
+            )
+        }
+        fan_in_fan_out_results.append(detection)
+
+        # Register as fan_in_fan_out ring (priority 2)
+        ring_mgr.add_ring(
+            pattern_type="fan_in_fan_out",
+            nodes=list(all_nodes),
+            risk_score=combined_risk * 100,
+            total_amount=total_amount,
+            explanation=detection["explanation"],
+        )
+
+    # Also register fan-in-only and fan-out-only accounts that aren't combined
+    for fi in fan_in_results:
+        if fi["account_id"] not in combined_hubs and fi["account_id"] not in legit_set:
+            senders = set(fi.get("senders", [])) - legit_set
+            nodes = list(senders | {fi["account_id"]})
+            if len(nodes) >= 2:
+                ring_mgr.add_ring(
+                    pattern_type="fan_in_aggregation",
+                    nodes=nodes,
+                    risk_score=fi.get("risk_score", 0.3) * 100,
+                    total_amount=fi.get("total_amount", 0),
+                    explanation=fi.get("explanation", ""),
+                )
+
+    for fo in fan_out_results:
+        if fo["account_id"] not in combined_hubs and fo["account_id"] not in legit_set:
+            receivers = set(fo.get("receivers", [])) - legit_set
+            nodes = list(receivers | {fo["account_id"]})
+            if len(nodes) >= 2:
+                ring_mgr.add_ring(
+                    pattern_type="fan_out_dispersal",
+                    nodes=nodes,
+                    risk_score=fo.get("risk_score", 0.3) * 100,
+                    total_amount=fo.get("total_amount", 0),
+                    explanation=fo.get("explanation", ""),
+                )
+
+    print(f"[PIPELINE] Fan-in/out: {len(fan_in_results)} in, {len(fan_out_results)} out, "
+          f"{len(combined_hubs)} combined hubs. "
+          f"Total rings: {len(ring_mgr.rings)}")
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 3: Shell chain detection (priority 3)
+    # ──────────────────────────────────────────────────────────
+    shell_results = await loop.run_in_executor(executor, detect_shell_chains, tg)
+
+    # Filter: exclude chains with legitimate nodes
+    for chain in shell_results:
+        nodes = chain.get("nodes", [])
+        if any(str(n) in legit_set for n in nodes):
+            continue
+        ring_mgr.add_ring(
+            pattern_type="layered_chain",
+            nodes=nodes,
+            risk_score=chain.get("risk_score", 0.3) * 100,
+            total_amount=chain.get("total_amount", 0),
+            explanation=chain.get("explanation", ""),
+        )
+
+    print(f"[PIPELINE] Shell chains: {len(shell_results)} detected. "
+          f"Total rings: {len(ring_mgr.rings)}")
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 4: Community detection (LOWEST PRIORITY)
+    # Only on nodes NOT assigned to any ring yet and NOT legitimate
+    # ──────────────────────────────────────────────────────────
+    community_results = await loop.run_in_executor(
+        executor,
+        lambda: detect_community_suspicion(
+            tg,
+            min_density=0.5,
+            exclude_nodes=legit_set,
+            already_in_ring=ring_mgr.get_assigned_accounts(),
+        )
+    )
+
+    for comm in community_results:
+        nodes = comm.get("nodes", [])
+        ring_mgr.add_ring(
+            pattern_type="community",
+            nodes=nodes,
+            risk_score=comm.get("risk_score", 0.2) * 100,
+            total_amount=comm.get("internal_flow", 0),
+            explanation=comm.get("explanation", ""),
+        )
+
+    print(f"[PIPELINE] Communities: {len(community_results)} detected. "
+          f"Total rings: {len(ring_mgr.rings)}, "
+          f"total accounts in rings: {len(ring_mgr.get_assigned_accounts())}")
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 5: Parallel independent detection modules
+    # (These don't produce rings, only flag accounts)
+    # ──────────────────────────────────────────────────────────
+    parallel_futures = {
+        "transaction_burst": loop.run_in_executor(
+            executor, detect_transaction_bursts, tg
+        ),
+        "rapid_movement": loop.run_in_executor(
+            executor, detect_rapid_movement, tg
+        ),
+        "dormant_activation": loop.run_in_executor(
+            executor, detect_dormant_activation, tg
+        ),
+        "structuring": loop.run_in_executor(
+            executor, detect_structuring, tg
+        ),
+        "diversity_shift": loop.run_in_executor(
+            executor, lambda: detect_diversity_shift(tg, exclude_nodes=legit_set)
+        ),
+        "centrality_spike": loop.run_in_executor(
+            executor, lambda: detect_centrality_spike(tg, exclude_nodes=legit_set)
+        ),
     }
-    
-    results = {}
-    for key, future in futures.items():
+
+    parallel_results = {}
+    for key, future in parallel_futures.items():
         try:
-            results[key] = await future
+            parallel_results[key] = await future
         except Exception as e:
-            print(f"Detection module {key} failed: {e}")
-            results[key] = []
-    
-    # Module 9 depends on cycle results
-    cycles = results.get("circular_routing", [])
+            print(f"[PIPELINE] Detection module {key} failed: {e}")
+            parallel_results[key] = []
+
+    # ──────────────────────────────────────────────────────────
+    # STEP 6: Amount consistency on detected cycles
+    # ──────────────────────────────────────────────────────────
     try:
-        results["amount_consistency_ring"] = detect_amount_consistency(tg, cycles)
+        amount_consistency = detect_amount_consistency(tg, filtered_cycles)
     except Exception as e:
-        print(f"Amount consistency module failed: {e}")
-        results["amount_consistency_ring"] = []
-    
-    return results
+        print(f"[PIPELINE] Amount consistency failed: {e}")
+        amount_consistency = []
+
+    # ──────────────────────────────────────────────────────────
+    # Assemble all detections
+    # ──────────────────────────────────────────────────────────
+    all_detections = {
+        "circular_routing": filtered_cycles,
+        "fan_in_aggregation": fan_in_results,
+        "fan_out_dispersal": fan_out_results,
+        "fan_in_fan_out": fan_in_fan_out_results,
+        "shell_chain": shell_results,
+        "community_suspicion": community_results,
+        "amount_consistency_ring": amount_consistency,
+        **parallel_results,
+    }
+
+    return all_detections, ring_mgr, legit_set, legit_scores
 
 
 # ─── Graph Visualization Endpoint ─────────────────────────────
@@ -276,11 +504,10 @@ async def generate_test_data(
             num_transactions=transactions,
             fraud_ratio=fraud_ratio,
         )
-        
-        # Save to static dir
+
         csv_path = os.path.join(STATIC_DIR, "test_data.csv")
         df.to_csv(csv_path, index=False)
-        
+
         return {
             "message": "Test data generated successfully",
             "stats": {
@@ -318,10 +545,10 @@ async def simulate_fraud(
     """
     if "latest" not in analysis_cache:
         raise HTTPException(status_code=400, detail="Run analysis first before simulation.")
-    
+
     latest = analysis_cache["latest"]
     summary = latest.get("summary", {})
-    
+
     simulation = {
         "scenario": scenario,
         "intensity": intensity,
@@ -341,7 +568,7 @@ async def simulate_fraud(
             f"Based on current patterns, the system predicts increased risk."
         ),
     }
-    
+
     return simulation
 
 
@@ -352,94 +579,63 @@ async def get_architecture():
     """Return system architecture documentation."""
     return {
         "architecture": {
-            "name": "RIFT - Financial Forensics Engine",
+            "name": "RIFT - Financial Forensics Engine v2.0",
             "design_principle": "Algorithmic graph intelligence without ML models",
-            "components": {
-                "input_layer": {
-                    "description": "CSV upload with strict validation",
-                    "validations": [
-                        "Schema validation (5 required columns)",
-                        "Missing value handling",
-                        "Duplicate transaction detection",
-                        "Timestamp format validation",
-                        "Amount validation (positive, numeric)",
-                        "Self-transfer detection",
-                        "Outlier flagging (IQR-based)"
-                    ]
-                },
-                "graph_engine": {
-                    "description": "Directed weighted temporal graph via NetworkX",
-                    "precomputed_features": [
-                        "In/out degree",
-                        "Betweenness centrality",
-                        "PageRank",
-                        "Clustering coefficient",
-                        "Temporal ordering",
-                        "Edge temporal index"
-                    ]
-                },
-                "detection_modules": [
-                    {"name": "Circular Routing", "complexity": "O(V+E) with bounded DFS"},
-                    {"name": "Fan-in Aggregation", "complexity": "O(V * T) sliding window"},
-                    {"name": "Fan-out Dispersal", "complexity": "O(V * T) sliding window"},
-                    {"name": "Shell Chains", "complexity": "O(V * E) BFS"},
-                    {"name": "Transaction Burst", "complexity": "O(V * T) rolling window"},
-                    {"name": "Rapid Movement", "complexity": "O(V * E) temporal BFS"},
-                    {"name": "Dormant Activation", "complexity": "O(V * T) gap analysis"},
-                    {"name": "Structuring", "complexity": "O(V * T) threshold analysis"},
-                    {"name": "Amount Consistency", "complexity": "O(C * E) cycle analysis"},
-                    {"name": "Diversity Shift", "complexity": "O(V * T) window analysis"},
-                    {"name": "Centrality Spike", "complexity": "O(V) percentile analysis"},
-                    {"name": "Community Suspicion", "complexity": "O(V + E) community detection"},
+            "pipeline": {
+                "description": "Waterfall priority detection pipeline",
+                "steps": [
+                    "1. Legitimacy filter (exclude merchants/payroll)",
+                    "2. Cycle detection (highest priority rings)",
+                    "3. Fan-in + Fan-out combined detection → fan_in_fan_out rings",
+                    "4. Shell chain detection → layered_chain rings",
+                    "5. Community detection (only remaining nodes, density > 0.5)",
+                    "6. Parallel: burst, rapid, dormant, structuring, diversity, centrality",
+                    "7. Amount consistency analysis on cycles",
+                    "8. Priority-aware scoring with ring manager",
                 ],
-                "scoring_engine": {
-                    "description": "Weighted multi-module scoring with FP reduction",
-                    "normalization": "0-100 scale",
-                    "false_positive_controls": [
-                        "Merchant detection",
-                        "Payroll detection",
-                        "Behavior stability scoring",
-                        "Long-term consistency analysis"
-                    ]
-                },
-                "visualization": {
-                    "description": "PyVis interactive graph with risk-based coloring",
-                    "features": [
-                        "Node color by risk level",
-                        "Ring highlighting",
-                        "Interactive tooltips",
-                        "Dark theme",
-                        "Physics-based layout"
-                    ]
-                }
+                "ring_priority": [
+                    "1. cycle (highest)",
+                    "2. fan_in_fan_out",
+                    "3. layered_chain",
+                    "4. community (lowest)",
+                ],
+                "dedup_rule": "Each account belongs to at most one ring; strongest pattern wins",
+                "legitimacy_filter": "Accounts with high volume, diversity, lifespan, and consistency are excluded",
             },
+            "detection_modules": [
+                {"name": "Circular Routing", "complexity": "O(V+E) with bounded DFS"},
+                {"name": "Fan-in Aggregation (≥3 senders)", "complexity": "O(V * T) sliding window"},
+                {"name": "Fan-out Dispersal (≥3 receivers)", "complexity": "O(V * T) sliding window"},
+                {"name": "Fan-in/Fan-out Mule Hub", "complexity": "O(V) intersection"},
+                {"name": "Shell Chains", "complexity": "O(V * E) BFS"},
+                {"name": "Transaction Burst", "complexity": "O(V * T) rolling window"},
+                {"name": "Rapid Movement", "complexity": "O(V * E) temporal BFS"},
+                {"name": "Dormant Activation", "complexity": "O(V * T) gap analysis"},
+                {"name": "Structuring", "complexity": "O(V * T) threshold analysis"},
+                {"name": "Amount Consistency", "complexity": "O(C * E) cycle analysis"},
+                {"name": "Diversity Shift", "complexity": "O(V * T) window analysis"},
+                {"name": "Centrality Spike", "complexity": "O(V) percentile analysis"},
+                {"name": "Community Suspicion (density > 0.5)", "complexity": "O(V + E)"},
+            ],
+            "false_positive_controls": [
+                "Legitimacy scoring (5-factor: volume, diversity, cycle-free, lifespan, consistency)",
+                "Ring priority hierarchy (no duplicate assignments)",
+                "Merchant detection (high diversity + stable + incoming)",
+                "Payroll detection (regular timing + fixed amounts)",
+                "Behavior stability scoring",
+            ],
             "performance": {
                 "target": "≤ 30 seconds for 10K transactions",
                 "optimizations": [
+                    "Legitimacy pre-filtering prunes ~30-50% of nodes",
+                    "Waterfall pipeline: later stages skip assigned accounts",
                     "Vectorized Pandas operations",
                     "Cached graph features",
                     "Node degree filtering",
                     "Parallel module execution (ThreadPoolExecutor)",
-                    "Early pruning and result limiting",
                     "Bounded cycle search (length ≤ 5)",
-                    "Approximate centrality for large graphs"
                 ]
             },
-            "limitations": [
-                "No ML-based detection (by design)",
-                "Cycle detection limited to length 5",
-                "Approximate centrality for >500 nodes",
-                "Single-file processing (no streaming)",
-                "In-memory graph (limited by RAM)"
-            ],
-            "threshold_tuning": {
-                "fan_in_senders": "Default: 10, reduce for higher recall",
-                "fan_out_receivers": "Default: 10, reduce for higher recall",
-                "dormancy_days": "Default: 30, increase for strict detection",
-                "burst_multiplier": "Default: 3x, reduce for sensitivity",
-                "structuring_count": "Default: 3, increase for precision",
-                "cycle_max_length": "Default: 5, increase for thoroughness"
-            }
         }
     }
 
