@@ -1,6 +1,6 @@
-"""Compact test of the refactored pipeline."""
+"""Compact test, writes to output.txt (utf-8)."""
 import requests
-import json
+import sys
 
 r = requests.post(
     'http://localhost:8000/api/analyze',
@@ -9,40 +9,49 @@ r = requests.post(
 data = r.json()
 s = data.get('summary', {})
 
-# Summary
-print("STATUS:", r.status_code)
-print(f"Accounts: {s.get('total_accounts_analyzed')}, "
-      f"Txns: {s.get('total_transactions_analyzed')}, "
-      f"Legit excluded: {s.get('legitimate_accounts_excluded', 0)}")
-print(f"Suspicious: {s.get('suspicious_accounts_found')}, "
-      f"Rings: {s.get('fraud_rings_detected')}")
-print(f"HighRisk: {s.get('high_risk_accounts')}, "
-      f"MedRisk: {s.get('medium_risk_accounts')}, "
-      f"LowRisk: {s.get('low_risk_accounts')}")
-print(f"Time: {s.get('processing_time_seconds')}s")
-print()
+lines = []
+lines.append(f"STATUS: {r.status_code}")
+lines.append(f"Accounts: {s.get('total_accounts_analyzed')}")
+lines.append(f"Transactions: {s.get('total_transactions_analyzed')}")
+lines.append(f"Legitimate excluded: {s.get('legitimate_accounts_excluded', 0)}")
+lines.append(f"Suspicious accounts: {s.get('suspicious_accounts_found')}")
+lines.append(f"Fraud rings: {s.get('fraud_rings_detected')}")
+lines.append(f"High risk: {s.get('high_risk_accounts')}")
+lines.append(f"Medium risk: {s.get('medium_risk_accounts')}")
+lines.append(f"Low risk: {s.get('low_risk_accounts')}")
+lines.append(f"Processing time: {s.get('processing_time_seconds')}s")
+lines.append(f"Modules: {s.get('detection_modules_triggered')}")
+lines.append("")
 
-# Rings
-print("--- RINGS ---")
+lines.append("=== FRAUD RINGS ===")
 for ring in data.get('fraud_rings', []):
-    print(f"  {ring['ring_id']} type={ring['type']} "
-          f"score={ring['risk_score']} nodes={ring['node_count']} "
-          f"amt=${ring['total_amount']:,.0f}")
-print()
+    lines.append(f"  {ring['ring_id']}  type={ring['type']}  score={ring['risk_score']}  nodes={ring['node_count']}  amount={ring['total_amount']}")
+lines.append("")
 
-# Ring types
 types = {}
-for r2 in data.get('fraud_rings', []):
-    t = r2['type']
+for ring in data.get('fraud_rings', []):
+    t = ring['type']
     types[t] = types.get(t, 0) + 1
-print("--- RING TYPES ---")
+lines.append("=== RING TYPE COUNTS ===")
 for t, c in sorted(types.items()):
-    print(f"  {t}: {c}")
-print()
+    lines.append(f"  {t}: {c}")
+lines.append("")
 
-# Top 5 accounts
-print("--- TOP 5 ACCOUNTS ---")
-for a in data.get('suspicious_accounts', [])[:5]:
-    print(f"  {a['account_id']} score={a['risk_score']} "
-          f"legit={a.get('legitimacy_score', 0):.2f} "
-          f"patterns={a['triggered_patterns']}")
+lines.append("=== TOP 10 SUSPICIOUS ===")
+for a in data.get('suspicious_accounts', [])[:10]:
+    lines.append(f"  {a['account_id']}  score={a['risk_score']}  legit={a.get('legitimacy_score',0):.2f}  patterns={a['triggered_patterns']}  rings={a.get('ring_ids',[])}")
+lines.append("")
+
+lines.append("=== SCORE DISTRIBUTION ===")
+scores = [a['risk_score'] for a in data.get('suspicious_accounts', [])]
+if scores:
+    lines.append(f"  Min: {min(scores):.1f}")
+    lines.append(f"  Max: {max(scores):.1f}")
+    import statistics
+    lines.append(f"  Mean: {statistics.mean(scores):.1f}")
+    lines.append(f"  Median: {statistics.median(scores):.1f}")
+
+with open('output.txt', 'w', encoding='utf-8') as f:
+    f.write('\n'.join(lines))
+
+print("Written to output.txt")

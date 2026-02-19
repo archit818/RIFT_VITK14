@@ -50,6 +50,13 @@ export default function StatsGrid({ summary }) {
             cardClass: 'low-risk',
         },
         {
+            value: summary.legitimate_accounts_excluded || 0,
+            label: 'Legitimate Excluded',
+            icon: '✅',
+            color: 'success',
+            cardClass: 'low-risk',
+        },
+        {
             value: `${summary.processing_time_seconds || 0}s`,
             label: 'Processing Time',
             icon: '⚡',

@@ -1,0 +1,77 @@
+STATUS: 200
+Accounts: 434
+Transactions: 4404
+Legitimate excluded: 165
+Suspicious accounts: 139
+Fraud rings: 41
+High risk: 1
+Medium risk: 2
+Low risk: 136
+Processing time: 8.31s
+Modules: ['rapid_movement', 'centrality_spike', 'diversity_shift', 'dormant_activation', 'transaction_burst', 'amount_consistency_ring', 'circular_routing', 'structuring', 'fan_out_dispersal', 'shell_chain', 'fan_in_aggregation']
+
+=== FRAUD RINGS ===
+  RING_004  type=cycle  score=44.24  nodes=3  amount=199193.92
+  RING_030  type=cycle  score=43.97  nodes=7  amount=7235.61
+  RING_002  type=cycle  score=43.12  nodes=3  amount=110600.36
+  RING_005  type=cycle  score=42.5  nodes=4  amount=209472.31
+  RING_045  type=cycle  score=41.2  nodes=6  amount=6268.65
+  RING_042  type=cycle  score=40.04  nodes=3  amount=2032.45
+  RING_028  type=cycle  score=39.71  nodes=6  amount=3297.53
+  RING_013  type=cycle  score=38.89  nodes=4  amount=1984.25
+  RING_019  type=cycle  score=38.48  nodes=3  amount=2760.65
+  RING_020  type=cycle  score=38.23  nodes=3  amount=1655.61
+  RING_012  type=cycle  score=37.91  nodes=3  amount=1375.41
+  RING_023  type=cycle  score=37.62  nodes=6  amount=7993.75
+  RING_041  type=cycle  score=37.2  nodes=3  amount=4707.43
+  RING_037  type=cycle  score=37.08  nodes=3  amount=1480.58
+  RING_003  type=cycle  score=36.92  nodes=4  amount=182233.87
+  RING_008  type=cycle  score=36.89  nodes=6  amount=8825.4
+  RING_038  type=cycle  score=36.81  nodes=3  amount=8392.55
+  RING_015  type=cycle  score=36.55  nodes=3  amount=6203.37
+  RING_009  type=cycle  score=36.52  nodes=3  amount=1473.08
+  RING_034  type=cycle  score=36.4  nodes=5  amount=1835.38
+  RING_026  type=cycle  score=36.38  nodes=3  amount=3169.68
+  RING_035  type=cycle  score=36.18  nodes=3  amount=5837.39
+  RING_001  type=cycle  score=36.02  nodes=4  amount=267081.71
+  RING_039  type=cycle  score=35.98  nodes=3  amount=1047.62
+  RING_040  type=cycle  score=35.88  nodes=3  amount=3466.88
+  RING_014  type=cycle  score=35.77  nodes=3  amount=5469.55
+  RING_025  type=cycle  score=35.14  nodes=3  amount=11086.61
+  RING_033  type=cycle  score=34.08  nodes=3  amount=8414.53
+  RING_018  type=cycle  score=34.06  nodes=6  amount=12928.46
+  RING_047  type=fan_in_aggregation  score=33.37  nodes=3  amount=3697.2
+  RING_036  type=cycle  score=33.25  nodes=3  amount=1505.2
+  RING_050  type=fan_out_dispersal  score=32.9  nodes=3  amount=90266.95
+  RING_053  type=fan_out_dispersal  score=32.81  nodes=5  amount=24702.8
+  RING_051  type=fan_out_dispersal  score=32.57  nodes=5  amount=86490.89
+  RING_054  type=fan_out_dispersal  score=32.49  nodes=3  amount=33558.79
+  RING_048  type=fan_in_aggregation  score=32.1  nodes=3  amount=12527.9
+  RING_024  type=cycle  score=31.4  nodes=3  amount=3216.78
+  RING_052  type=fan_out_dispersal  score=30.99  nodes=3  amount=8084.13
+  RING_046  type=fan_in_aggregation  score=30.33  nodes=3  amount=1920.92
+  RING_029  type=cycle  score=29.96  nodes=3  amount=6242.29
+  RING_049  type=fan_in_aggregation  score=28.02  nodes=3  amount=635.5
+
+=== RING TYPE COUNTS ===
+  cycle: 32
+  fan_in_aggregation: 4
+  fan_out_dispersal: 5
+
+=== TOP 10 SUSPICIOUS ===
+  ACC-00278  score=85.0  legit=0.49  patterns=['transaction_burst', 'circular_routing']  rings=['RING_030']
+  ACC-00214  score=67.27  legit=0.48  patterns=['amount_consistency_ring', 'transaction_burst', 'fan_in_aggregation', 'circular_routing']  rings=['RING_045']
+  ACC-00403  score=52.08  legit=0.41  patterns=['rapid_movement', 'transaction_burst', 'amount_consistency_ring', 'circular_routing', 'shell_chain']  rings=['RING_002']
+  ACC-00414  score=38.89  legit=0.44  patterns=['shell_chain', 'amount_consistency_ring', 'circular_routing']  rings=['RING_005']
+  ACC-00114  score=36.4  legit=0.47  patterns=['transaction_burst', 'amount_consistency_ring', 'circular_routing']  rings=['RING_034']
+  ACC-00368  score=35.84  legit=0.49  patterns=['transaction_burst', 'circular_routing']  rings=['RING_028']
+  ACC-00413  score=34.94  legit=0.41  patterns=['rapid_movement', 'shell_chain', 'amount_consistency_ring', 'circular_routing']  rings=['RING_004']
+  ACC-00424  score=34.38  legit=0.41  patterns=['rapid_movement', 'shell_chain', 'amount_consistency_ring', 'circular_routing']  rings=['RING_004']
+  ACC-00188  score=34.11  legit=0.48  patterns=['transaction_burst', 'circular_routing']  rings=['RING_013']
+  ACC-00175  score=33.89  legit=0.49  patterns=['transaction_burst', 'circular_routing']  rings=['RING_023']
+
+=== SCORE DISTRIBUTION ===
+  Min: 15.0
+  Max: 85.0
+  Mean: 25.6
+  Median: 25.9
