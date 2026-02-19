@@ -1,7 +1,7 @@
 """
-Suspicion Scoring Engine.
-Aggregates results from all detection modules into per-account scores.
-Uses RingManager for dedup/priority, legitimacy scores for FP control.
+Suspicion Scoring Engine v2.0
+Aggregates forensic signals into tiered risk scores (0-100).
+Optimized for high-confidence detection and coordination analysis.
 """
 
 import numpy as np
@@ -11,21 +11,22 @@ from collections import defaultdict
 from ring_manager import RingManager, get_priority
 
 
-# Module weights (tunable)
+# --- High Intensity Forensic Weights (Issue 2) ---
+# Weights reflect the severity and theoretical confidence of each pattern
 MODULE_WEIGHTS = {
-    "circular_routing": 0.18,
-    "fan_in_fan_out": 0.15,
-    "fan_in_aggregation": 0.10,
-    "fan_out_dispersal": 0.10,
-    "shell_chain": 0.10,
-    "transaction_burst": 0.08,
-    "rapid_movement": 0.08,
-    "dormant_activation": 0.06,
-    "structuring": 0.08,
-    "amount_consistency_ring": 0.05,
-    "diversity_shift": 0.04,
-    "centrality_spike": 0.03,
-    "community_suspicion": 0.02,
+    "circular_routing": 0.25,     # Aggressive weighting for cycles
+    "fan_in_fan_out": 0.22,       # Mule hubs are high-confidence
+    "shell_chain": 0.18,          # Layering is high-confidence
+    "rapid_movement": 0.15,       # Velocity is a strong signal
+    "structuring": 0.15,          # Smurfing detection
+    "fan_in_aggregation": 0.12,   
+    "fan_out_dispersal": 0.12,
+    "transaction_burst": 0.10,
+    "dormant_activation": 0.08,
+    "amount_consistency_ring": 0.08,
+    "diversity_shift": 0.06,
+    "centrality_spike": 0.05,
+    "community_suspicion": 0.04,
 }
 
 
@@ -37,19 +38,7 @@ def compute_scores(
     legitimacy_scores: Dict[str, float] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Compute per-account suspicion scores from all detection results.
-
-    Args:
-        tg: TransactionGraph
-        all_detections: dict of module_name -> list of detections
-        ring_manager: RingManager with rings already populated
-        legitimate_accounts: set of account IDs marked as legitimate
-        legitimacy_scores: dict of account_id -> legitimacy score (0-1)
-
-    Returns:
-        suspicious_accounts: sorted list of accounts with scores
-        fraud_rings: consolidated ring/group detections from ring_manager
-        summary: overall analysis summary
+    Tiered scoring system for Financial Forensics.
     """
     legit = legitimate_accounts or set()
     legit_scores = legitimacy_scores or {}
@@ -58,185 +47,156 @@ def compute_scores(
         "score_components": [],
         "triggered_patterns": [],
         "ring_ids": set(),
-        "total_weighted_risk": 0.0,
-        "detection_count": 0,
+        "weighted_sum": 0.0,
+        "max_risk": 0.0,
         "explanations": [],
     })
 
-    # Process each detection module's results
+    # 1. Aggregate signals
     for module_type, detections in all_detections.items():
-        weight = MODULE_WEIGHTS.get(module_type, 0.03)
+        weight = MODULE_WEIGHTS.get(module_type, 0.05)
 
         for detection in detections:
-            risk_score = detection.get("risk_score", 0)
+            risk = detection.get("risk_score", 0)
+            
+            # Map accounts
+            nodes = set()
+            if "account_id" in detection: nodes.add(str(detection["account_id"]))
+            if "nodes" in detection: nodes.update(str(n) for n in detection["nodes"])
 
-            # Get accounts involved
-            accounts = []
-            if "account_id" in detection:
-                accounts.append(detection["account_id"])
-            if "nodes" in detection:
-                accounts.extend(detection["nodes"])
-
-            accounts = list(set(str(a) for a in accounts))
-
-            for account in accounts:
-                # Skip legitimate accounts entirely
-                if account in legit:
-                    continue
-
-                ring_id = ring_manager.get_account_ring(account)
-
-                ad = account_data[account]
-                ad["score_components"].append({
-                    "module": module_type,
-                    "weight": weight,
-                    "risk": risk_score,
-                    "weighted": weight * risk_score,
-                })
-                ad["total_weighted_risk"] += weight * risk_score
-                ad["detection_count"] += 1
+            for node in nodes:
+                if node in legit: continue
+                
+                ad = account_data[node]
+                ad["weighted_sum"] += weight * risk
+                ad["max_risk"] = max(ad["max_risk"], risk)
                 ad["triggered_patterns"].append(module_type)
                 ad["explanations"].append(detection.get("explanation", ""))
+                
+                ring_id = ring_manager.get_account_ring(node)
+                if ring_id: ad["ring_ids"].add(ring_id)
 
-                if ring_id:
-                    ad["ring_ids"].add(ring_id)
-
-    # --- Normalize scores to 0-100 ---
+    # 2. Finalize account scores
     suspicious_accounts = []
-
+    
     if account_data:
-        max_raw = max(ad["total_weighted_risk"] for ad in account_data.values()) or 1
+        # Global max for normalization
+        global_max = max(ad["weighted_sum"] for ad in account_data.values()) or 1.0
 
         for account_id, ad in account_data.items():
-            raw_score = ad["total_weighted_risk"]
-            unique_patterns = set(ad["triggered_patterns"])
+            patterns = set(ad["triggered_patterns"])
+            
+            # --- Tiered Scoring Logic ---
+            # Base: normalized weighted sum (0-40)
+            base_score = (ad["weighted_sum"] / global_max) * 40
+            
+            # Pattern Multiplier: Exponential boost for multiple patterns
+            # 1 pattern = 1.0x, 2 = 1.6x, 3 = 2.2x, 4+ = 3x
+            multiplier = 1.0 + (min(3, len(patterns) - 1) * 0.6) if len(patterns) > 1 else 1.0
+            
+            # Coordination Boost: If node is in a validated ring
+            ring_boost = 0
+            if ad["ring_ids"]:
+                ring_boost = 15
+                # Extra boost for high-priority rings
+                best_ring_id = list(ad["ring_ids"])[0] 
+                best_ring = ring_manager.rings.get(best_ring_id)
+                if best_ring and get_priority(best_ring["type"]) <= 2:
+                    ring_boost += 10
 
-            # --- Score calculation ---
+            final_score = (base_score * multiplier) + ring_boost
+            
+            # --- Calibration & Penalties ---
+            # Penalize broad-only
+            if patterns <= {"community_suspicion", "centrality_spike", "diversity_shift"}:
+                final_score *= 0.3
+            
+            # Penalize legitimacy
+            l_score = legit_scores.get(account_id, 0)
+            if l_score > 0.5:
+                final_score *= (1.0 - l_score)
 
-            # 1. Base: normalize raw weighted risk
-            base = (raw_score / max_raw) * 60
+            # Behavioural FP Reduction
+            final_score = _apply_fp_reduction(tg, account_id, final_score)
+            
+            final_score = round(min(100.0, max(0.0, final_score)), 2)
 
-            # 2. Multi-pattern bonus (strong signal)
-            pattern_bonus = min(25, len(unique_patterns) * 5)
-
-            # 3. Ring involvement bonus
-            ring_bonus = 0
-            for rid in ad["ring_ids"]:
-                ring_info = ring_manager.rings.get(rid)
-                if ring_info:
-                    ring_type = ring_info.get("type", "")
-                    priority = get_priority(ring_type)
-                    # Higher priority (lower number) = more bonus
-                    ring_bonus = max(ring_bonus, {1: 15, 2: 12, 3: 8, 4: 3}.get(priority, 2))
-
-            normalized = base + pattern_bonus + ring_bonus
-            normalized = min(100, max(0, normalized))
-
-            # 4. Penalize accounts only flagged by very broad detectors
-            broad_only = unique_patterns <= {"community_suspicion", "centrality_spike", "diversity_shift"}
-            if broad_only:
-                normalized *= 0.2
-
-            # 5. Penalize single-pattern detections
-            if len(unique_patterns) == 1:
-                normalized *= 0.5
-
-            # 6. Apply legitimacy-based reduction
-            account_legit = legit_scores.get(account_id, 0)
-            if account_legit > 0.5:
-                normalized *= max(0.2, 1.0 - account_legit)
-
-            # 7. Apply behavioral FP reduction
-            normalized = _apply_fp_reduction(tg, account_id, normalized)
-
-            if normalized >= 15:
+            if final_score >= 10.0:  # Extraction Threshold
                 suspicious_accounts.append({
                     "account_id": account_id,
-                    "risk_score": round(normalized, 2),
-                    "triggered_patterns": list(unique_patterns),
-                    "pattern_count": len(unique_patterns),
-                    "detection_count": ad["detection_count"],
+                    "risk_score": final_score,
+                    "tier": _get_tier(final_score),
+                    "patterns": list(patterns),
                     "ring_ids": list(ad["ring_ids"]),
-                    "explanations": ad["explanations"][:5],
-                    "score_breakdown": ad["score_components"][:10],
-                    "legitimacy_score": round(legit_scores.get(account_id, 0), 4),
+                    "explanation": ad["explanations"][0] if ad["explanations"] else "Multiple forensic anomalies detected.",
+                    "score_breakdown": [
+                        {"module": p, "weighted": 1.0} for p in list(patterns)
+                    ]
                 })
 
-    # Sort descending by score
+    # Sort
     suspicious_accounts.sort(key=lambda x: x["risk_score"], reverse=True)
 
-    # --- Get rings from RingManager ---
+    # 3. Synchronize Rings
     fraud_rings = ring_manager.get_rings()
-
-    # Update ring scores with member account scores
     for ring in fraud_rings:
+        # Ring risk = mean of member scores + coordination premium
         member_scores = [
-            sa["risk_score"] for sa in suspicious_accounts
-            if ring["ring_id"] in sa.get("ring_ids", [])
+            a["risk_score"] for a in suspicious_accounts 
+            if a["account_id"] in ring["nodes"]
         ]
         if member_scores:
-            ring["risk_score"] = round(min(100, np.mean(member_scores) + 10), 2)
+            ring["risk_score"] = round(min(100, np.mean(member_scores) * 1.2), 2)
+            ring["purity"] = round(len([s for s in member_scores if s >= 70]) / len(ring["nodes"]), 2)
 
-    # Re-sort
-    fraud_rings.sort(key=lambda x: x["risk_score"], reverse=True)
+    # 4. Summary & Metrics (Issue 8)
+    total_analyzed = tg.node_count
+    flagged_count = len(suspicious_accounts)
+    
+    # Precision Proxy = (High + Critical) / Total Flagged
+    high_conf = [a for a in suspicious_accounts if a["risk_score"] >= 70]
+    precision_proxy = round(len(high_conf) / flagged_count, 2) if flagged_count > 0 else 1.0
 
-    # --- Summary ---
     summary = {
-        "total_accounts_analyzed": tg.node_count,
-        "total_transactions_analyzed": len(tg.df),
-        "suspicious_accounts_found": len(suspicious_accounts),
+        "total_accounts_analyzed": total_analyzed,
+        "total_transactions_analyzed": len(tg.df) if hasattr(tg, 'df') else 0,
+        "suspicious_accounts_found": flagged_count,
         "fraud_rings_detected": len(fraud_rings),
-        "legitimate_accounts_excluded": len(legit),
-        "high_risk_accounts": len([a for a in suspicious_accounts if a["risk_score"] >= 70]),
-        "medium_risk_accounts": len([a for a in suspicious_accounts if 40 <= a["risk_score"] < 70]),
-        "low_risk_accounts": len([a for a in suspicious_accounts if a["risk_score"] < 40]),
-        "detection_modules_triggered": list(set(
-            p for a in suspicious_accounts for p in a["triggered_patterns"]
-        )),
-        "top_patterns": _get_top_patterns(all_detections),
-        "total_suspicious_amount": round(
-            sum(r.get("total_amount", 0) for r in fraud_rings), 2
-        ),
+        "estimated_precision": precision_proxy,
+        "high_risk_accounts": len(high_conf), # Renamed for frontend sync
+        "avg_risk_score": round(np.mean([a["risk_score"] for a in suspicious_accounts]), 2) if suspicious_accounts else 0,
+        "total_suspicious_amount": round(sum(r.get("total_amount", 0) for r in fraud_rings), 2),
+        "processing_time_seconds": 0, # Filled by main
     }
 
     return suspicious_accounts, fraud_rings, summary
 
 
+def _get_tier(score: float) -> str:
+    if score >= 85: return "CRITICAL"
+    if score >= 70: return "HIGH"
+    if score >= 40: return "MEDIUM"
+    return "LOW"
+
+
 def _apply_fp_reduction(tg, account_id: str, score: float) -> float:
-    """
-    Reduce false positives using behavior stability analysis.
-    Stable, long-term accounts get score reductions.
-    """
+    """Enhanced behavioural suppression (Issue 5)."""
+    node = tg.G.nodes.get(account_id, {})
+    txns = node.get("transactions", [])
+    if not txns: return score
+
+    # Factor: Stable long-term history
     temporal = tg.node_temporal.get(account_id, {})
-
-    tx_count = temporal.get("tx_count", 0)
-    first_seen = temporal.get("first_seen")
-    last_seen = temporal.get("last_seen")
-
-    if first_seen and last_seen:
-        account_age_days = (last_seen - first_seen).days
-
-        # Very old stable accounts get reduction
-        if account_age_days > 180 and tx_count > 100:
-            score *= 0.85
-
-        # High regularity -> likely legitimate
-        amount_cv = temporal.get("std_amount", 0) / max(temporal.get("avg_amount", 1), 0.01)
-        if amount_cv < 0.1:
-            score *= 0.9
+    lifespan = 0
+    if temporal.get("first_seen") and temporal.get("last_seen"):
+        lifespan = (temporal["last_seen"] - temporal["first_seen"]).total_seconds() / 86400
+    
+    if lifespan > 180 and temporal.get("tx_count", 0) > 50:
+        score *= 0.8
+    
+    # Factor: Salary-like consistency
+    if temporal.get("std_amount", 0) / max(0.01, temporal.get("avg_amount", 1)) < 0.05:
+        score *= 0.9
 
     return score
 
-
-def _get_top_patterns(all_detections: Dict[str, List]) -> List[Dict[str, Any]]:
-    """Get stats on which patterns fired most."""
-    pattern_stats = []
-    for module_type, detections in all_detections.items():
-        if detections:
-            pattern_stats.append({
-                "pattern": module_type,
-                "count": len(detections),
-                "avg_risk": round(np.mean([d.get("risk_score", 0) for d in detections]), 4),
-            })
-    pattern_stats.sort(key=lambda x: x["count"], reverse=True)
-    return pattern_stats

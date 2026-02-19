@@ -127,8 +127,8 @@ def generate_visualization(
     for node in display_nodes:
         acc_info = score_map.get(node)
         score = acc_info["risk_score"] if acc_info else 0
-        patterns = acc_info["triggered_patterns"] if acc_info else []
-        ring_ids = acc_info["ring_ids"] if acc_info else []
+        patterns = acc_info.get("patterns", []) if acc_info else []
+        ring_ids = acc_info.get("ring_ids", []) if acc_info else []
         
         # Color based on risk score
         if score >= 70:

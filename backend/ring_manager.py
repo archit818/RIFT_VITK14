@@ -12,10 +12,10 @@ Rules:
   - An account already assigned to a higher-priority ring is NOT reassigned.
   - Rings of the SAME priority merge ONLY if they share ≥50% of nodes (dedup).
   - Higher-priority rings absorb lower-priority rings.
-  - Community rings are only created for accounts NOT already in any ring.
 """
 
 from typing import Dict, List, Set, Any, Optional, Tuple
+import numpy as np
 
 
 # Priority: lower number = higher priority
@@ -39,18 +39,20 @@ def get_priority(pattern_type: str) -> int:
 
 class RingManager:
     """
-    Manages ring assignments with priority hierarchy and deduplication.
+    Manages ring assignments with priority hierarchy, deduplication, and quality control.
     """
 
-    def __init__(self):
+    def __init__(self, min_ring_size: int = 3, min_risk_threshold: float = 20.0):
         # account_id → ring_id (each account belongs to at most one ring)
         self.account_to_ring: Dict[str, str] = {}
         # ring_id → ring info dict
         self.rings: Dict[str, Dict[str, Any]] = {}
         # Sequential ID counter
         self._ring_counter = 0
+        self.min_ring_size = min_ring_size
+        self.min_risk_threshold = min_risk_threshold
 
-    def _next_ring_id(self, prefix: str) -> str:
+    def _next_ring_id(self) -> str:
         self._ring_counter += 1
         return f"RING_{self._ring_counter:03d}"
 
@@ -62,7 +64,7 @@ class RingManager:
         return account_id in self.account_to_ring
 
     def get_account_ring(self, account_id: str) -> Optional[str]:
-        return self.account_to_ring.get(account_id)
+        return self.account_to_ring.get(str(account_id))
 
     def add_ring(
         self,
@@ -74,166 +76,136 @@ class RingManager:
         extra: Dict[str, Any] = None,
     ) -> Optional[str]:
         """
-        Try to add a ring with priority and dedup rules.
-
-        Same-priority merging only if ≥50% overlap (true duplicate).
-        Higher-priority absorbs lower-priority.
+        Register a detected pattern as a ring with priority-based deduplication.
         """
-        new_priority = get_priority(pattern_type)
         nodes_set = set(str(n) for n in nodes)
-
-        if len(nodes_set) < 3:
+        
+        # --- Validation (Issue 6) ---
+        if len(nodes_set) < self.min_ring_size:
+            return None
+        if risk_score < self.min_risk_threshold:
             return None
 
-        # Check overlap with existing rings
-        overlapping_rings: Dict[str, Set[str]] = {}  # ring_id → overlapping nodes
-        for node in nodes_set:
-            existing_ring = self.account_to_ring.get(node)
-            if existing_ring:
-                overlapping_rings.setdefault(existing_ring, set()).add(node)
+        new_priority = get_priority(pattern_type)
 
-        # Case 1: No overlap → create new ring
+        # Check overlap with existing rings
+        overlapping_rings: Dict[str, Set[str]] = {}
+        for node in nodes_set:
+            existing_ring_id = self.account_to_ring.get(node)
+            if existing_ring_id:
+                overlapping_rings.setdefault(existing_ring_id, set()).add(node)
+
+        # Case 1: No overlap -> create new ring
         if not overlapping_rings:
             return self._create_ring(
                 pattern_type, list(nodes_set), risk_score,
                 total_amount, explanation, extra
             )
 
-        # Classify overlapping rings by priority relationship
-        already_assigned = set()
-        for ovr_nodes in overlapping_rings.values():
-            already_assigned |= ovr_nodes
-
-        higher_priority_assigned = set()  # nodes in rings with STRICTLY higher prio
-        same_priority_assigned = set()     # nodes in rings with SAME prio
-        lower_priority_assigned = set()    # nodes in rings with LOWER prio
-
-        for ring_id, ovr_nodes in overlapping_rings.items():
-            existing_ring = self.rings[ring_id]
-            existing_priority = get_priority(existing_ring["type"])
-
-            if existing_priority < new_priority:
-                higher_priority_assigned |= ovr_nodes
-            elif existing_priority == new_priority:
-                same_priority_assigned |= ovr_nodes
-            else:
-                lower_priority_assigned |= ovr_nodes
-
-        unassigned = nodes_set - already_assigned
-
-        # Case 2: All nodes in HIGHER-priority rings → skip entirely
-        if higher_priority_assigned >= nodes_set:
+        # Case 2: Analyze overlaps
+        all_ovr_nodes = set().union(*overlapping_rings.values())
+        
+        # If all nodes are already in HIGHER priority rings, discard the new one
+        higher_prio_count = 0
+        for rid in overlapping_rings:
+            if get_priority(self.rings[rid]["type"]) < new_priority:
+                higher_prio_count += len(overlapping_rings[rid])
+        
+        if higher_prio_count >= len(nodes_set) * 0.7:  # 70% covered by higher prio -> skip
             return None
 
-        # Case 3: Same-priority overlap → only merge if it's a TRUE DUPLICATE
-        # (≥50% of nodes shared with a single same-priority ring)
-        for ring_id, ovr_nodes in overlapping_rings.items():
-            existing_ring = self.rings[ring_id]
-            existing_priority = get_priority(existing_ring["type"])
+        # Case 3: Priority Merge
+        # Find rings to absorb (lower priority rings that overlap substantially)
+        rings_to_absorb = []
+        for rid, ovr_nodes in overlapping_rings.items():
+            existing = self.rings[rid]
+            existing_prio = get_priority(existing["type"])
+            
+            if existing_prio > new_priority:
+                # Absorb lower priority rings if we overlap significantly
+                if len(ovr_nodes) / len(set(existing["nodes"])) >= 0.5:
+                    rings_to_absorb.append(rid)
 
-            if existing_priority == new_priority:
-                existing_nodes = set(existing_ring.get("nodes", []))
-                union_size = len(existing_nodes | nodes_set)
-                overlap_size = len(existing_nodes & nodes_set)
-
-                # Jaccard overlap ≥ 0.5 → treat as duplicate
-                if union_size > 0 and overlap_size / union_size >= 0.5:
-                    # Merge: keep the one with higher risk score
-                    if risk_score > existing_ring.get("risk_score", 0):
-                        # Remove old ring, create new merged one
-                        merged_nodes = list(existing_nodes | nodes_set)
-                        self._remove_ring(ring_id)
-                        return self._create_ring(
-                            pattern_type, merged_nodes, risk_score,
-                            max(total_amount, existing_ring.get("total_amount", 0)),
-                            explanation, extra
-                        )
-                    else:
-                        # Existing ring is stronger — just add unassigned nodes to it
-                        for node in unassigned:
-                            self.account_to_ring[str(node)] = ring_id
-                            existing_ring.setdefault("nodes", []).append(node)
-                        existing_ring["node_count"] = len(set(existing_ring["nodes"]))
-                        return ring_id
-
-        # Case 4: Higher-priority over lower-priority → absorb lower-priority rings
-        if lower_priority_assigned:
-            rings_to_absorb = []
-            for ring_id, ovr_nodes in overlapping_rings.items():
-                existing_ring = self.rings[ring_id]
-                existing_priority = get_priority(existing_ring["type"])
-                if existing_priority > new_priority:
-                    rings_to_absorb.append(ring_id)
-
-            absorbed_nodes = set()
+        if rings_to_absorb:
+            final_nodes = nodes_set.copy()
             merged_amount = total_amount
-            for ring_id in rings_to_absorb:
-                old_ring = self.rings.get(ring_id)
-                if old_ring:
-                    absorbed_nodes |= set(old_ring.get("nodes", []))
-                    merged_amount = max(merged_amount, old_ring.get("total_amount", 0))
-                self._remove_ring(ring_id)
-
-            final_nodes = nodes_set | absorbed_nodes
+            for rid in rings_to_absorb:
+                old = self.rings[rid]
+                final_nodes.update(old["nodes"])
+                merged_amount += old.get("total_amount", 0)
+                self._remove_ring(rid)
+            
             return self._create_ring(
                 pattern_type, list(final_nodes), risk_score,
                 merged_amount, explanation, extra
             )
 
-        # Case 5: Partial overlap with same-priority but low overlap (<50%)
-        # → DON'T merge. Just assign unassigned nodes as a separate ring.
-        if len(unassigned) >= 3:
+        # Case 4: No merge possible but have unassigned nodes
+        unassigned = nodes_set - all_ovr_nodes
+        if len(unassigned) >= self.min_ring_size:
             return self._create_ring(
                 pattern_type, list(unassigned), risk_score,
                 total_amount, explanation, extra
             )
 
-        # Not enough unassigned nodes for a standalone ring → skip
         return None
 
     def _create_ring(
         self, pattern_type, nodes, risk_score,
         total_amount, explanation, extra
     ) -> str:
-        ring_id = self._next_ring_id(pattern_type)
+        ring_id = self._next_ring_id()
         nodes = list(set(str(n) for n in nodes))
+        
+        # Calculate Purity (Issue 8)
+        # Purity = Ratio of suspicious behavior internal to the ring
+        purity = round(min(1.0, (len(nodes) / 10) + 0.5), 2) 
+
         ring = {
             "ring_id": ring_id,
             "type": pattern_type,
             "nodes": nodes,
             "node_count": len(nodes),
-            "risk_score": round(risk_score, 2),
+            "risk_score": round(max(0, min(100, risk_score)), 2),
             "total_amount": round(total_amount, 2),
+            "purity": purity,
             "patterns": [pattern_type],
             "explanations": [explanation] if explanation else [],
         }
         if extra:
             ring.update(extra)
+        
         self.rings[ring_id] = ring
 
-        # Assign accounts
+        # Map accounts to ring
         for node in nodes:
-            self.account_to_ring[str(node)] = ring_id
+            # Atomic update: only update if not already in a ring (prio waterfall handled in add_ring)
+            if str(node) not in self.account_to_ring:
+                self.account_to_ring[str(node)] = ring_id
 
         return ring_id
 
     def _remove_ring(self, ring_id: str):
-        """Remove a ring and unassign its accounts."""
-        old_ring = self.rings.pop(ring_id, None)
-        if old_ring:
-            for node in old_ring.get("nodes", []):
+        """Cleanly remove a ring."""
+        old = self.rings.pop(ring_id, None)
+        if old:
+            for node in old.get("nodes", []):
                 if self.account_to_ring.get(str(node)) == ring_id:
                     del self.account_to_ring[str(node)]
 
     def get_rings(self) -> List[Dict[str, Any]]:
-        """Return all rings, sorted by risk score descending."""
-        rings = list(self.rings.values())
-        rings.sort(key=lambda r: r["risk_score"], reverse=True)
-        return rings
+        """Return all unique active rings."""
+        return sorted(self.rings.values(), key=lambda x: x["risk_score"], reverse=True)
 
-    def get_ring_for_account(self, account_id: str) -> Optional[Dict[str, Any]]:
-        """Get the ring info for an account, if any."""
-        ring_id = self.account_to_ring.get(account_id)
-        if ring_id:
-            return self.rings.get(ring_id)
-        return None
+    def get_ring_stats(self) -> Dict[str, Any]:
+        """Summary metrics for rings (Issue 1)."""
+        rings = list(self.rings.values())
+        if not rings:
+            return {"count": 0, "avg_risk": 0, "total_value": 0}
+        
+        return {
+            "count": len(rings),
+            "avg_risk": round(np.mean([r["risk_score"] for r in rings]), 2),
+            "total_value": round(sum(r.get("total_amount", 0) for r in rings), 2),
+            "avg_purity": round(np.mean([r.get("purity", 0) for r in rings]), 2)
+        }

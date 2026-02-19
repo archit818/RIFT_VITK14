@@ -21,6 +21,10 @@ export default function Dashboard({ results, apiBase, onReset }) {
         window.location.href = `${apiBase}/api/export-json`;
     };
 
+    const handleDownloadGraph = () => {
+        window.location.href = `${apiBase}/api/download-graph`;
+    };
+
     return (
         <div className="dashboard">
             {/* Summary success alert */}
@@ -121,7 +125,14 @@ export default function Dashboard({ results, apiBase, onReset }) {
 
             {activeTab === 'graph' && (
                 <div className="fade-up">
-                    <h2 className="section-title">Interactive Network Graph</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <h2 className="section-title" style={{ margin: 0 }}>Interactive Network Graph</h2>
+                        {results.graph_url && (
+                            <button className="btn btn-secondary" onClick={handleDownloadGraph} style={{ fontSize: '0.65rem' }}>
+                                DOWNLOAD_TOPOLOGY_MAP
+                            </button>
+                        )}
+                    </div>
                     {results.graph_url ? (
                         <GraphView url={`${apiBase}${results.graph_url}`} fullHeight />
                     ) : (
@@ -143,6 +154,9 @@ export default function Dashboard({ results, apiBase, onReset }) {
             <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '64px', paddingBottom: '64px' }}>
                 <button className="btn btn-secondary" onClick={onReset} id="new-analysis-btn">
                     TERMINATE_SESSION
+                </button>
+                <button className="btn btn-secondary" onClick={handleDownloadGraph} id="download-graph-btn">
+                    SAVE_TOPOLOGY_MAP
                 </button>
                 <button
                     className="btn btn-primary"

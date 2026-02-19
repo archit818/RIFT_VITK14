@@ -69,11 +69,11 @@ export default function AccountsTable({ accounts, compact = false }) {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                {(account.triggered_patterns || []).slice(0, compact ? 2 : 5).map((p, j) => (
+                                                {(account.patterns || []).slice(0, compact ? 2 : 5).map((p, j) => (
                                                     <span key={j} className="pattern-tag">{p.replace(/_/g, ' ')}</span>
                                                 ))}
-                                                {(account.triggered_patterns || []).length > (compact ? 2 : 5) && (
-                                                    <span className="pattern-tag">+{account.triggered_patterns.length - (compact ? 2 : 5)}</span>
+                                                {(account.patterns || []).length > (compact ? 2 : 5) && (
+                                                    <span className="pattern-tag">+{account.patterns.length - (compact ? 2 : 5)}</span>
                                                 )}
                                             </div>
                                         </td>
@@ -102,11 +102,9 @@ export default function AccountsTable({ accounts, compact = false }) {
                                                         Forensic Explanation
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {(account.explanations || []).map((exp, j) => (
-                                                            <div key={j} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                                {exp}
-                                                            </div>
-                                                        ))}
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                            {account.explanation}
+                                                        </div>
                                                     </div>
 
                                                     {account.score_breakdown && (
