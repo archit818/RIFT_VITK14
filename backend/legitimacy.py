@@ -70,37 +70,50 @@ def compute_legitimacy_scores(tg) -> Dict[str, float]:
         lifespan_score = 0.0
         if temporal.get("first_seen") and temporal.get("last_seen"):
             days = (temporal["last_seen"] - temporal["first_seen"]).total_seconds() / 86400
-            lifespan_score = min(1.0, days / 150)
+            lifespan_score = min(1.0, days / 180) # Slower maturity for high scores
+
+        # ─── Robot Automation Detection (Task 7) ────────
+        automation_penalty = 0.0
+        timestamps = temporal.get("timestamps", [])
+        if len(timestamps) >= 8:
+            intervals = []
+            for i in range(1, len(timestamps)):
+                d = (timestamps[i] - timestamps[i-1]).total_seconds()
+                if d > 0: intervals.append(d)
+            if intervals:
+                cv = np.std(intervals) / np.mean(intervals)
+                if cv < 0.005: automation_penalty = 0.8  # Near-perfect rhythmic script
+                elif cv < 0.02: automation_penalty = 0.4
 
         # ─── Temporal Regularity ────────────────────────
         regularity_score = _compute_temporal_regularity(temporal)
 
         # ─── Diversity Entropy ──────────────────────────
         entropy_score = _compute_diversity_entropy(temporal)
-
-        # ─── Negative signals ───────────────────────────
         malicious_penalty = 0.0
+        
+        # Mule Hub Penalty: High-volume passthrough behavior
+        if _has_immediate_redistribution(tg, node, temporal):
+            malicious_penalty += 0.45
+            
         if node in cycle_nodes:
             malicious_penalty += 0.7
         if node in structuring_suspects:
             malicious_penalty += 0.35
 
-        rapid_penalty = _check_rapid_movement_indicator(tg, node, temporal)
-        malicious_penalty += rapid_penalty
-
         # ─── Combine (Task 7: strengthened) ─────────────
         best_profile = max(merchant_score, payroll_score, hub_score, platform_score)
 
         legitimacy = (
-            best_profile * 0.30 +
-            stability_score * 0.25 +    # TASK 3: stability is now more important
+            best_profile * 0.35 +
+            stability_score * 0.25 +
             lifespan_score * 0.15 +
-            regularity_score * 0.15 +
+            regularity_score * 0.10 +
             entropy_score * 0.10 +
-            min(1.0, tx_count / 80) * 0.05
+            min(1.0, tx_count / 100) * 0.05
         )
 
-        final_score = max(0.0, min(1.0, legitimacy - malicious_penalty))
+        final_score = max(0.0, min(1.0, legitimacy - malicious_penalty - automation_penalty))
         scores[node] = round(final_score, 4)
 
     return scores

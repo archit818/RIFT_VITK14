@@ -8,23 +8,15 @@ from typing import List, Dict, Any, Set
 from datetime import timedelta
 
 
-def detect_fan_out(
+def detect_dispersal(
     tg,
-    threshold_receivers: int = 3,
-    window_hours: int = 24,
+    threshold_receivers: int = 5,
+    window_hours: int = 48,
     exclude_nodes: Set[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Detect fan-out dispersal patterns.
-
-    An account sending to many unique receivers rapidly
-    may be dispersing aggregated illicit funds.
-
-    Args:
-        tg: TransactionGraph
-        threshold_receivers: minimum unique receivers in window (default: 3)
-        window_hours: time window in hours (default: 24)
-        exclude_nodes: set of legitimate account IDs to skip
+    1 account sending to 5+ distinct accounts within 48 hours.
     """
     results = []
     window = timedelta(hours=window_hours)
@@ -60,25 +52,15 @@ def detect_fan_out(
             if len(unique_receivers) >= threshold_receivers:
                 amounts = [t["amount"] for t in window_txns]
 
-                # Velocity analysis: transactions per hour
-                time_span = (window_txns[-1]["timestamp"] - window_txns[0]["timestamp"]).total_seconds() / 3600
-                velocity = len(window_txns) / max(time_span, 0.01)
-
                 fan_out_windows.append({
                     "start": txn["timestamp"],
                     "end": window_end,
                     "receiver_count": len(unique_receivers),
                     "receivers": list(unique_receivers),
                     "total_amount": sum(amounts),
-                    "avg_amount": np.mean(amounts),
-                    "velocity": velocity,
                 })
 
         if not fan_out_windows:
-            continue
-
-        # Skip if looks like payroll
-        if _is_likely_payroll(tg, node, fan_out_windows):
             continue
 
         best_window = max(fan_out_windows, key=lambda w: w["receiver_count"])
@@ -86,25 +68,21 @@ def detect_fan_out(
         risk = _calculate_fan_out_risk(
             best_window["receiver_count"],
             best_window["total_amount"],
-            best_window["velocity"],
+            10.0, # default velocity
             threshold_receivers
         )
 
         results.append({
             "account_id": node,
-            "type": "fan_out_dispersal",
+            "type": "fan_in_fan_out",
+            "nodes": [node] + best_window["receivers"],
             "receiver_count": best_window["receiver_count"],
-            "receivers": best_window["receivers"][:20],
             "window_start": str(best_window["start"]),
             "window_end": str(best_window["end"]),
             "total_amount": round(best_window["total_amount"], 2),
-            "avg_amount": round(best_window["avg_amount"], 2),
-            "velocity": round(best_window["velocity"], 2),
             "risk_score": risk,
             "explanation": (
-                f"Account {node} dispersed funds to {best_window['receiver_count']} receivers "
-                f"within {window_hours}h. Total: ${best_window['total_amount']:,.2f}. "
-                f"Velocity: {best_window['velocity']:.1f} tx/hour."
+                f"Dispersal detected: Account {node} sent funds to {best_window['receiver_count']} receivers within {window_hours}h."
             )
         })
 

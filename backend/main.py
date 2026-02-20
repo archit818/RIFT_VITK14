@@ -39,9 +39,9 @@ from visualization import generate_visualization
 from synthetic import generate_synthetic_data, generate_edge_case_data
 
 from detectors.circular_routing import detect_circular_routing
-from detectors.fan_in import detect_fan_in
-from detectors.fan_out import detect_fan_out
-from detectors.shell_chains import detect_shell_chains
+from detectors.fan_in import detect_smurfing
+from detectors.fan_out import detect_dispersal
+from detectors.shell_chains import detect_layering
 from detectors.burst import detect_transaction_bursts
 from detectors.rapid_movement import detect_rapid_movement
 from detectors.dormant import detect_dormant_activation
@@ -206,6 +206,11 @@ async def analyze_transactions(file: UploadFile = File(...)):
     elapsed = round(time.time() - start_time, 2)
 
     # --- Build Response (Issue 1 & 9) ---
+    # Cleanup internal fields
+    for acc in suspicious_accounts:
+        acc.pop("_is_core", None)
+        acc.pop("_patterns", None)
+
     summary["processing_time_seconds"] = elapsed
     summary["engine_status"] = "FORENSIC_INTEGRITY_HIGH"
     
@@ -241,64 +246,35 @@ async def _run_detection_pipeline(tg: TransactionGraph):
 
     # ──────────────────────────────────────────────────────────
     # STEP 0: Legitimacy filter (Tasks 3 & 7)
-    # ──────────────────────────────────────────────────────────
-    legit_set, legit_scores = filter_legitimate_accounts(tg, threshold=0.70)
+    # REDUCED THRESHOLD: Allow for automated fan-in detection while still suppressing massive legitimate hubs
+    legit_set, legit_scores = filter_legitimate_accounts(tg, threshold=0.85)
 
     # ─── Phase 1: High-Priority Structural Detections ─────────────
-    # Detected patterns are collected first, then consolidated into networks
+    # We DO NOT filter by legitimacy here: detection must see all nodes.
+    # Suppression happens during scoring via weighted penalties.
     
     # Cycle detection
     cycles = await loop.run_in_executor(executor, detect_circular_routing, tg)
-    filtered_cycles = [c for c in cycles if not any(str(n) in legit_set for n in c["nodes"])]
-
-    # ──────────────────────────────────────────────────────────
-    # STEP 2: Fan-in + Fan-out (TASK 2: raised thresholds to 4)
-    # ──────────────────────────────────────────────────────────
-    fan_in_results = await loop.run_in_executor(
-        executor, lambda: detect_fan_in(tg, threshold_senders=10, exclude_nodes=legit_set)
+    
+    # Smurfing detection
+    smurfing_results = await loop.run_in_executor(
+        executor, lambda: detect_smurfing(tg, threshold_senders=4, exclude_nodes=None) # Reduced threshold for structured smurfing
     )
-    fan_out_results = await loop.run_in_executor(
-        executor, lambda: detect_fan_out(tg, threshold_receivers=10, window_hours=72, exclude_nodes=legit_set)
+    
+    # Layering detection
+    layering_results = await loop.run_in_executor(executor, detect_layering, tg)
+
+    # Dispersal detection (mapped to fan_in_fan_out)
+    dispersal_results = await loop.run_in_executor(
+        executor, lambda: detect_dispersal(tg, threshold_receivers=4, window_hours=48, exclude_nodes=None)
     )
-
-    fan_in_hubs = {d["account_id"]: d for d in fan_in_results}
-    fan_out_hubs = {d["account_id"]: d for d in fan_out_results}
-    combined_hubs = set(fan_in_hubs.keys()) & set(fan_out_hubs.keys())
-
-    fan_in_fan_out_results = []
-    for hub_id in combined_hubs:
-        fi, fo = fan_in_hubs[hub_id], fan_out_hubs[hub_id]
-        all_nodes = {hub_id} | set(fi["senders"]) | set(fo["receivers"])
-        all_nodes -= legit_set
-
-        total_flow = fi["total_amount"] + fo["total_amount"]
-        risk = max(fi["risk_score"], fo["risk_score"]) * 1.2
-
-        detection = {
-            "account_id": hub_id,
-            "type": "fan_in_fan_out",
-            "nodes": list(all_nodes),
-            "risk_score": min(1.0, risk),
-            "total_amount": total_flow,
-            "explanation": f"Complex Mule Hub {hub_id}: {len(fi['senders'])} in -> {len(fo['receivers'])} out."
-        }
-        fan_in_fan_out_results.append(detection)
-
-    # Shell chain detection
-    shell_results = await loop.run_in_executor(executor, detect_shell_chains, tg)
-
-    # Simplified hubs for network pass
-    filtered_fi = [f for f in fan_in_results if f["account_id"] not in combined_hubs]
-    filtered_fo = [f for f in fan_out_results if f["account_id"] not in combined_hubs]
 
     # Community Suspicion
     community_results = await loop.run_in_executor(
-        executor, lambda: detect_community_suspicion(tg, exclude_nodes=legit_set, already_in_ring=set())
+        executor, lambda: detect_community_suspicion(tg, exclude_nodes=None, already_in_ring=set())
     )
 
-    # ──────────────────────────────────────────────────────────
-    # STEP 5: Parallel behavioral modules (Task 9: concurrent)
-    # ──────────────────────────────────────────────────────────
+    # Simplified logic for network pass
     parallel_futures = {
         "transaction_burst": loop.run_in_executor(executor, detect_transaction_bursts, tg),
         "dormant_activation": loop.run_in_executor(executor, detect_dormant_activation, tg),
@@ -318,31 +294,22 @@ async def _run_detection_pipeline(tg: TransactionGraph):
         multi_window_rapid = []
 
     # ──────────────────────────────────────────────────────────
-    # STEP 6: Amount consistency on detected cycles
+    # STEP 6: Amount consistency on detected cycles (Removed from pipeline)
     # ──────────────────────────────────────────────────────────
-    try: amt_consistency = detect_amount_consistency(tg, filtered_cycles)
-    except: amt_consistency = []
 
     # ──────────────────────────────────────────────────────────
-    # STEP 7: Advanced graph signals
+    # STEP 7: Advanced graph signals (Removed from pipeline)
     # ──────────────────────────────────────────────────────────
-    try: diversity_results = await loop.run_in_executor(executor, detect_diversity_shift, tg)
-    except: diversity_results = []
-
-    try: centrality_results = await loop.run_in_executor(executor, detect_centrality_spike, tg)
-    except: centrality_results = []
 
     all_detections = {
-        "circular_routing": filtered_cycles,
-        "fan_in_aggregation": filtered_fi,
-        "fan_out_dispersal": filtered_fo,
-        "fan_in_fan_out": fan_in_fan_out_results,
-        "shell_chain": shell_results,
+        "circular_routing": cycles,
+        "fan_in_aggregation": smurfing_results,
+        "shell_chain": layering_results,
+        "fan_in_fan_out": dispersal_results,
         "community_suspicion": community_results,
-        "amount_consistency_ring": amt_consistency,
         "rapid_movement": multi_window_rapid,
-        "diversity_shift": diversity_results,
-        "centrality_spike": centrality_results,
+        "diversity_shift": [],
+        "centrality_spike": [],
         **parallel_results,
     }
 

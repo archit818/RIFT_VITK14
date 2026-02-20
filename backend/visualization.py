@@ -129,7 +129,7 @@ def generate_visualization(
         score = acc_info["risk_score"] if acc_info else 0
         patterns = acc_info.get("patterns", []) if acc_info else []
         ring_ids = acc_info.get("ring_ids", []) if acc_info else []
-        is_core = acc_info.get("is_core", False) if acc_info else False
+        is_core = acc_info.get("_is_core", False) if acc_info else False
         is_peripheral = acc_info.get("is_peripheral", False) if acc_info else False
         
         # Color based on risk score

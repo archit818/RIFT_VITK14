@@ -79,6 +79,10 @@ def validate_csv(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
         df = df[~dup_mask].copy()
 
     # --- Amount validation ---
+    if df["amount"].dtype == object:
+        # Strip currency symbols and commas
+        df["amount"] = df["amount"].astype(str).str.replace(r'[₹$€,]', '', regex=True)
+    
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     bad_amount = df["amount"].isna()
     if bad_amount.sum() > 0:
@@ -111,7 +115,12 @@ def validate_csv(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
             df.loc[outlier_mask, "_outlier"] = True
 
     # --- Timestamp validation ---
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", format="mixed")
+    # Flexible parsing: handle various formats autonomously
+    try:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", format="mixed")
+    except Exception:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    
     bad_ts = df["timestamp"].isna()
     if bad_ts.sum() > 0:
         warnings.append(ValidationError(

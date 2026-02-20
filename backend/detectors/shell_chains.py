@@ -9,102 +9,60 @@ from typing import List, Dict, Any
 from collections import deque
 
 
-def detect_shell_chains(tg, min_path_length: int = 3, max_path_length: int = 6) -> List[Dict[str, Any]]:
+def detect_layering(tg, min_hops: int = 3) -> List[Dict[str, Any]]:
     """
-    Detect layered shell chains.
-    
-    Shell accounts:
-    - Low total degree (≤ 2)
-    - Low transaction count
-    - Act as intermediaries in longer paths
+    Detect layering chains: A->B->C->D.
+    Each hop passes >60% of received amount forward.
     """
     results = []
     chain_id = 0
     seen_chains = set()
-    
-    # Identify shell candidates (low activity nodes)
-    shell_candidates = set()
-    for node in tg.G.nodes():
-        total_degree = tg.in_degree.get(node, 0) + tg.out_degree.get(node, 0)
-        tx_count = tg.node_temporal.get(node, {}).get("tx_count", 0)
-        if total_degree <= 3 and tx_count <= 3:
-            shell_candidates.add(node)
-    
-    if not shell_candidates:
-        return results
-    
-    # Find paths through shell nodes using BFS
-    # Start from high-out-degree nodes
-    source_nodes = [
-        n for n in tg.G.nodes()
-        if tg.out_degree.get(n, 0) >= 2 and n not in shell_candidates
-    ]
-    
-    for source in source_nodes:
-        # BFS to find paths through shell accounts
-        queue = deque([(source, [source], 0)])
-        visited = set()
+
+    # Start from any node that has an outgoing transaction
+    for start_node in tg.G.nodes():
+        # State: (current_node, path, received_amount, last_timestamp)
+        # For the source node, we treat "received_amount" as infinite to start
+        queue = deque([(start_node, [start_node], float('inf'), None)])
         
-        while queue and len(results) < 300:
-            current, path, shell_count = queue.popleft()
+        while queue:
+            current, path, received_amt, last_ts = queue.popleft()
             
-            if len(path) > max_path_length:
+            if len(path) > 8: # Safety limit
                 continue
-            
-            state = (current, len(path))
-            if state in visited:
-                continue
-            visited.add(state)
-            
+                
             for successor in tg.G.successors(current):
                 if successor in path:
                     continue
                 
+                # Get the transfer amount (sum of all txs)
+                edge_data = tg.G[current][successor]
+                sent_amt = edge_data["total_amount"]
+                
+                # Each hop passes >60% of received amount forward
+                if received_amt != float('inf') and sent_amt < (received_amt * 0.6):
+                    continue
+                
                 new_path = path + [successor]
-                new_shell = shell_count + (1 if successor in shell_candidates else 0)
                 
-                # Check if this is a valid shell chain
-                if len(new_path) >= min_path_length + 1:
-                    # Count intermediate shell nodes
-                    intermediates = new_path[1:-1]
-                    shell_intermediates = [n for n in intermediates if n in shell_candidates]
-                    
-                    if len(shell_intermediates) >= max(1, len(intermediates) // 2):
-                        chain_key = tuple(sorted(new_path))
-                        if chain_key not in seen_chains:
-                            seen_chains.add(chain_key)
-                            chain_id += 1
-                            
-                            # Calculate chain metadata
-                            total_amount = 0
-                            for i in range(len(new_path) - 1):
-                                u, v = new_path[i], new_path[i + 1]
-                                if tg.G.has_edge(u, v):
-                                    total_amount += tg.G[u][v]["total_amount"]
-                            
-                            risk = _calculate_shell_risk(
-                                len(new_path), len(shell_intermediates), total_amount
-                            )
-                            
-                            results.append({
-                                "ring_id": f"RING-SHELL-{chain_id:04d}",
-                                "type": "shell_chain",
-                                "nodes": new_path,
-                                "chain_length": len(new_path),
-                                "shell_nodes": shell_intermediates,
-                                "shell_count": len(shell_intermediates),
-                                "total_amount": round(total_amount, 2),
-                                "risk_score": risk,
-                                "explanation": (
-                                    f"Layered chain of {len(new_path)} accounts with "
-                                    f"{len(shell_intermediates)} shell intermediaries. "
-                                    f"Total flow: ₹{total_amount:,.2f}."
-                                )
-                            })
+                if len(new_path) >= min_hops + 1: # hops = len(nodes) - 1
+                    chain_key = tuple(new_path)
+                    if chain_key not in seen_chains:
+                        seen_chains.add(chain_key)
+                        chain_id += 1
+                        
+                        results.append({
+                            "ring_id": f"RING-LAY-{chain_id:04d}",
+                            "type": "layering",
+                            "nodes": new_path,
+                            "hops": len(new_path) - 1,
+                            "total_amount": round(sent_amt, 2),
+                            "risk_score": 0.8,
+                            "explanation": f"Layering chain of {len(new_path)-1} hops where each step passes >60% of funds forward."
+                        })
                 
-                if len(new_path) <= max_path_length:
-                    queue.append((successor, new_path, new_shell))
-    
+                # Continue BFS
+                queue.append((successor, new_path, sent_amt, None))
+
     return results
 
 

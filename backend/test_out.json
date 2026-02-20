@@ -1,0 +1,1437 @@
+{
+  "num_suspicious": 43,
+  "num_rings": 5,
+  "suspicious_accounts": [
+    {
+      "account_id": "ACC_01003",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9544.70. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01008",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,474.83. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01005",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,258.03. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01006",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9539.80. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01002",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,132.88. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "SMURF_01",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 12 inflows / 0 outflows, total volume \u20b912,577.11. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01001",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9630.41. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01004",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9827.96. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01010",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9830.66. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01011",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,383.90. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01000",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,838.27. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01009",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b91,317.41. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_01007",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_004"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_004) with 13 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9798.26. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "MERCHANT_01",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 1 days, 20 inflows / 0 outflows, total volume \u20b96,309.08. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02006",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b991.74. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02013",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9487.90. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02012",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9291.30. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02000",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9412.62. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02015",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9298.42. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02017",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9328.33. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02005",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9201.47. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02009",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9321.68. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02001",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9364.16. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02008",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9431.37. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02019",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9309.81. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02018",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9437.77. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02003",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9119.97. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02011",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9378.38. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02014",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9220.34. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02007",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b993.52. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02010",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9413.21. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02016",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9423.23. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02004",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9480.75. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_02002",
+      "risk_score": 28.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "ring_ids": [
+        "RING_005"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Fan In Aggregation. Member of fan in aggregation ring (RING_005) with 21 accounts, purity 0%. Active 0 days, 0 inflows / 1 outflows, total volume \u20b9203.11. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "fan_in_aggregation"
+      ]
+    },
+    {
+      "account_id": "ACC_00123",
+      "risk_score": 18.38,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_001"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_001) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b929,000.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00234",
+      "risk_score": 13.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_002"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_002) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b943,000.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00567",
+      "risk_score": 13.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_002"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_002) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b943,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00890",
+      "risk_score": 13.79,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_002"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_002) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b942,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00456",
+      "risk_score": 13.78,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_001"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_001) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b929,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00789",
+      "risk_score": 13.78,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_001"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_001) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b928,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00678",
+      "risk_score": 13.78,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_003"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_003) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b935,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00901",
+      "risk_score": 13.78,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_003"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_003) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b934,500.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    },
+    {
+      "account_id": "ACC_00345",
+      "risk_score": 13.78,
+      "tier": "LOW",
+      "confidence": 0.25,
+      "patterns": [
+        "circular_routing"
+      ],
+      "ring_ids": [
+        "RING_003"
+      ],
+      "explanation": "[CORE MEMBER] Primary signals: Circular Routing. Member of circular routing ring (RING_003) with 3 accounts, purity 0%. Active 0 days, 1 inflows / 1 outflows, total volume \u20b935,000.00. Confidence: 25% (LOW).",
+      "signal_summary": {
+        "strong_signals": 1,
+        "weak_signals": 0,
+        "unique_patterns": 1,
+        "has_structural": true,
+        "has_behavioral": false,
+        "multi_signal_gate": false
+      },
+      "_is_core": true,
+      "is_peripheral": false,
+      "_patterns": [
+        "circular_routing"
+      ]
+    }
+  ],
+  "rings": [
+    {
+      "ring_id": "RING_001",
+      "nodes": [
+        "ACC_00123",
+        "ACC_00456",
+        "ACC_00789"
+      ],
+      "node_count": 3,
+      "type": "circular_routing",
+      "risk_score": 17.77,
+      "confidence": "MEDIUM",
+      "purity": 0.0,
+      "signal_coherence": 1.0,
+      "validated": true
+    },
+    {
+      "ring_id": "RING_002",
+      "nodes": [
+        "ACC_00234",
+        "ACC_00567",
+        "ACC_00890"
+      ],
+      "node_count": 3,
+      "type": "circular_routing",
+      "risk_score": 14.55,
+      "confidence": "MEDIUM",
+      "purity": 0.0,
+      "signal_coherence": 1.0,
+      "validated": true
+    },
+    {
+      "ring_id": "RING_003",
+      "nodes": [
+        "ACC_00678",
+        "ACC_00901",
+        "ACC_00345"
+      ],
+      "node_count": 3,
+      "type": "circular_routing",
+      "risk_score": 14.54,
+      "confidence": "MEDIUM",
+      "purity": 0.0,
+      "signal_coherence": 1.0,
+      "validated": true
+    },
+    {
+      "ring_id": "RING_004",
+      "nodes": [
+        "SMURF_01",
+        "ACC_01003",
+        "ACC_01008",
+        "ACC_01005",
+        "ACC_01006",
+        "ACC_01002",
+        "ACC_01001",
+        "ACC_01004",
+        "ACC_01010",
+        "ACC_01011",
+        "ACC_01000",
+        "ACC_01009",
+        "ACC_01007"
+      ],
+      "node_count": 13,
+      "type": "fan_in_aggregation",
+      "risk_score": 32.48,
+      "confidence": "MEDIUM",
+      "purity": 0.0,
+      "signal_coherence": 1.0,
+      "validated": true
+    },
+    {
+      "ring_id": "RING_005",
+      "nodes": [
+        "MERCHANT_01",
+        "ACC_02006",
+        "ACC_02013",
+        "ACC_02012",
+        "ACC_02000",
+        "ACC_02015",
+        "ACC_02017",
+        "ACC_02005",
+        "ACC_02009",
+        "ACC_02001",
+        "ACC_02008",
+        "ACC_02019",
+        "ACC_02018",
+        "ACC_02003",
+        "ACC_02011",
+        "ACC_02014",
+        "ACC_02007",
+        "ACC_02010",
+        "ACC_02016",
+        "ACC_02004",
+        "ACC_02002"
+      ],
+      "node_count": 21,
+      "type": "fan_in_aggregation",
+      "risk_score": 33.17,
+      "confidence": "MEDIUM",
+      "purity": 0.0,
+      "signal_coherence": 1.0,
+      "validated": true
+    }
+  ],
+  "ring_mgr_rings": [
+    {
+      "ring_id": "RING_001",
+      "type": "circular_routing",
+      "nodes": [
+        "ACC_00123",
+        "ACC_00456",
+        "ACC_00789"
+      ],
+      "node_count": 3,
+      "risk_score": 0.0,
+      "total_amount": 130500.0,
+      "purity": 0.0,
+      "confidence_score": 0.6,
+      "temporal_consistency": 1.0,
+      "cluster_density": 0.5,
+      "patterns": [
+        "circular_routing"
+      ],
+      "explanations": [
+        "Validated 3-node cycle. Funds moved sequentially through nodes within 4.0 hours."
+      ],
+      "validated": true,
+      "core_members": [
+        "ACC_00123",
+        "ACC_00456",
+        "ACC_00789"
+      ],
+      "peripheral_members": [],
+      "core_count": 3
+    },
+    {
+      "ring_id": "RING_002",
+      "type": "circular_routing",
+      "nodes": [
+        "ACC_00234",
+        "ACC_00567",
+        "ACC_00890"
+      ],
+      "node_count": 3,
+      "risk_score": 0.0,
+      "total_amount": 193500.0,
+      "purity": 0.0,
+      "confidence_score": 0.6,
+      "temporal_consistency": 1.0,
+      "cluster_density": 0.5,
+      "patterns": [
+        "circular_routing"
+      ],
+      "explanations": [
+        "Validated 3-node cycle. Funds moved sequentially through nodes within 6.0 hours."
+      ],
+      "validated": true,
+      "core_members": [
+        "ACC_00234",
+        "ACC_00567",
+        "ACC_00890"
+      ],
+      "peripheral_members": [],
+      "core_count": 3
+    },
+    {
+      "ring_id": "RING_003",
+      "type": "circular_routing",
+      "nodes": [
+        "ACC_00678",
+        "ACC_00901",
+        "ACC_00345"
+      ],
+      "node_count": 3,
+      "risk_score": 0.0,
+      "total_amount": 157500.0,
+      "purity": 0.0,
+      "confidence_score": 0.6,
+      "temporal_consistency": 1.0,
+      "cluster_density": 0.5,
+      "patterns": [
+        "circular_routing"
+      ],
+      "explanations": [
+        "Validated 3-node cycle. Funds moved sequentially through nodes within 2.0 hours."
+      ],
+      "validated": true,
+      "core_members": [
+        "ACC_00678",
+        "ACC_00901",
+        "ACC_00345"
+      ],
+      "peripheral_members": [],
+      "core_count": 3
+    },
+    {
+      "ring_id": "RING_004",
+      "type": "fan_in_aggregation",
+      "nodes": [
+        "SMURF_01",
+        "ACC_01003",
+        "ACC_01008",
+        "ACC_01005",
+        "ACC_01006",
+        "ACC_01002",
+        "ACC_01001",
+        "ACC_01004",
+        "ACC_01010",
+        "ACC_01011",
+        "ACC_01000",
+        "ACC_01009",
+        "ACC_01007"
+      ],
+      "node_count": 13,
+      "risk_score": 0.0,
+      "total_amount": 163502.43,
+      "purity": 0.0,
+      "confidence_score": 0.6,
+      "temporal_consistency": 1.0,
+      "cluster_density": 0.07692307692307693,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "explanations": [
+        "Aggregated Fan-in: Account SMURF_01 received funds from 12 senders within 48h. Automation confidence: 100%. Sequential ID ratio: 100%."
+      ],
+      "validated": true,
+      "core_members": [
+        "SMURF_01",
+        "ACC_01003",
+        "ACC_01008",
+        "ACC_01005",
+        "ACC_01006",
+        "ACC_01002",
+        "ACC_01001",
+        "ACC_01004",
+        "ACC_01010",
+        "ACC_01011",
+        "ACC_01000",
+        "ACC_01009",
+        "ACC_01007"
+      ],
+      "peripheral_members": [],
+      "core_count": 13
+    },
+    {
+      "ring_id": "RING_005",
+      "type": "fan_in_aggregation",
+      "nodes": [
+        "MERCHANT_01",
+        "ACC_02006",
+        "ACC_02013",
+        "ACC_02012",
+        "ACC_02000",
+        "ACC_02015",
+        "ACC_02017",
+        "ACC_02005",
+        "ACC_02009",
+        "ACC_02001",
+        "ACC_02008",
+        "ACC_02019",
+        "ACC_02018",
+        "ACC_02003",
+        "ACC_02011",
+        "ACC_02014",
+        "ACC_02007",
+        "ACC_02010",
+        "ACC_02016",
+        "ACC_02004",
+        "ACC_02002"
+      ],
+      "node_count": 21,
+      "risk_score": 0.0,
+      "total_amount": 132490.68,
+      "purity": 0.0,
+      "confidence_score": 0.6,
+      "temporal_consistency": 1.0,
+      "cluster_density": 0.047619047619047616,
+      "patterns": [
+        "fan_in_aggregation"
+      ],
+      "explanations": [
+        "Aggregated Fan-in: Account MERCHANT_01 received funds from 20 senders within 48h. Automation confidence: 100%. Sequential ID ratio: 100%."
+      ],
+      "validated": true,
+      "core_members": [
+        "MERCHANT_01",
+        "ACC_02006",
+        "ACC_02013",
+        "ACC_02012",
+        "ACC_02000",
+        "ACC_02015",
+        "ACC_02017",
+        "ACC_02005",
+        "ACC_02009",
+        "ACC_02001",
+        "ACC_02008",
+        "ACC_02019",
+        "ACC_02018",
+        "ACC_02003",
+        "ACC_02011",
+        "ACC_02014",
+        "ACC_02007",
+        "ACC_02010",
+        "ACC_02016",
+        "ACC_02004",
+        "ACC_02002"
+      ],
+      "peripheral_members": [],
+      "core_count": 21
+    }
+  ]
+}

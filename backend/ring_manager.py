@@ -38,9 +38,7 @@ STRUCTURAL_PATTERNS = {"cycle", "circular_routing", "shell_chain", "layered_chai
 
 # Core-defining patterns for ring membership
 CORE_DEFINING_PATTERNS = {
-    "cycle", "circular_routing", "shell_chain",
-    "layered_chain", "fan_in_fan_out",
-    "fan_in_aggregation", "fan_out_dispersal",
+    "circular_routing", "shell_chain", "fan_in_aggregation", "fan_in_fan_out",
     "rapid_movement", "structuring",
 }
 
@@ -119,78 +117,71 @@ class RingManager:
         global_risk_graph = nx.Graph()
         global_risk_graph.add_nodes_from(suspicious_nodes)
         
-        # 2a. Add edges from detections (Star Topology - Task 1)
-        for module_type, detections in all_detections.items():
-            if module_type in CORE_DEFINING_PATTERNS:
-                for det in detections:
-                    nodes = [str(n) for n in det.get("nodes", [])]
-                    hub = str(det.get("account_id")) if det.get("account_id") else (nodes[0] if nodes else None)
-                    if not hub: continue
-                    for node in nodes:
-                        if node != hub:
-                            global_risk_graph.add_edge(hub, node, weight=0.8, type="pattern")
-
-        # 2b. Add interaction edges (Optimized O(E_suspicious) instead of O(N^2))
-        for u in suspicious_nodes:
-            # Check only neighbors in the original transaction graph
-            for v in tg.G.successors(u):
-                if v in suspicious_nodes and v != u:
-                    is_edge, weight = self._is_high_risk_edge(tg, u, v, node_patterns[u], node_patterns[v])
-                    if is_edge:
-                        global_risk_graph.add_edge(u, v, weight=weight, type="interaction")
-
-        # 3. TASK 2: Temporal Rolling Windows (72 hours)
+        # 2a. Add Pattern-Based Rings Directly (Strict Separation for Cycles)
         processed_nodes = set()
-        core_candidates = self._identify_core_members(list(suspicious_nodes), node_patterns, tg)
         
-        def get_safe_time(node):
-            val = tg.node_temporal.get(node, {}).get("first_seen")
-            if val is None or pd.isna(val): return pd.Timestamp("1970-01-01")
-            return pd.Timestamp(val)
+        # Priority 1: Cycles (Each unique cycle is a separate ring)
+        if "circular_routing" in all_detections:
+            for det in all_detections["circular_routing"]:
+                nodes = [str(n) for n in det.get("nodes", [])]
+                if not nodes: continue
+                self._create_network_ring(nodes, nodes, node_patterns, node_detections, tg, p_type="circular_routing")
+                processed_nodes.update(nodes)
 
-        # Process cores chronologically
-        core_candidates.sort(key=get_safe_time)
+        # Priority 2: Other Structural (Layering, Smurfing)
+        for p_type in ["shell_chain", "fan_in_aggregation", "fan_in_fan_out"]:
+            if p_type in all_detections:
+                for det in all_detections[p_type]:
+                    nodes = [str(n) for n in det.get("nodes", [])]
+                    # Cycles take priority; skip if too many nodes already processed
+                    active_nodes = [n for n in nodes if n not in processed_nodes]
+                    if len(active_nodes) < 2: continue
+                    self._create_network_ring(active_nodes, active_nodes, node_patterns, node_detections, tg, p_type=p_type)
+                    processed_nodes.update(active_nodes)
 
-        for core in core_candidates:
-            if core in processed_nodes:
-                continue
+        # 3. TASK 2: Controlled Expansion for remaining suspicious nodes
+        remaining_suspicious = suspicious_nodes - processed_nodes
+        if remaining_suspicious:
+            core_candidates = self._identify_core_members(list(remaining_suspicious), node_patterns, tg)
             
-            core_time = get_safe_time(core)
-            if core_time == pd.Timestamp("1970-01-01"): continue
+            def get_safe_time(node):
+                val = tg.node_temporal.get(node, {}).get("first_seen")
+                if val is None or pd.isna(val): return pd.Timestamp("1970-01-01")
+                return pd.Timestamp(val)
 
-            # Window definition (72 hours total)
-            window_start = core_time - timedelta(hours=36)
-            window_end = core_time + timedelta(hours=36)
-            
-            # BFS 2-hop expansion restricted by time (Task 2 & 3)
-            component = {core}
-            queue = [(core, 0)]
-            visited = {core}
-            
-            while queue:
-                current, hop = queue.pop(0)
-                if hop >= 2: continue
+            core_candidates.sort(key=get_safe_time)
+
+            for core in core_candidates:
+                if core in processed_nodes:
+                    continue
                 
-                if current not in global_risk_graph: continue
-                for neighbor in global_risk_graph.neighbors(current):
-                    if neighbor in visited or neighbor in processed_nodes:
-                        continue
+                core_time = get_safe_time(core)
+                window_start = core_time - timedelta(hours=36)
+                window_end = core_time + timedelta(hours=36)
+                
+                # BFS 2-hop expansion
+                component = {core}
+                queue = [(core, 0)]
+                visited = {core}
+                
+                while queue:
+                    current, hop = queue.pop(0)
+                    if hop >= 2: continue
                     
-                    n_time = get_safe_time(neighbor)
-                    if n_time != pd.Timestamp("1970-01-01"):
-                        if window_start <= n_time <= window_end:
+                    if current not in global_risk_graph: continue
+                    for neighbor in global_risk_graph.neighbors(current):
+                        if neighbor in visited or neighbor in processed_nodes:
+                            continue
+                        
+                        n_time = get_safe_time(neighbor)
+                        if n_time == pd.Timestamp("1970-01-01") or (window_start <= n_time <= window_end):
                             visited.add(neighbor)
                             component.add(neighbor)
                             queue.append((neighbor, hop + 1))
-                    else:
-                        # Nodes without time (e.g. pattern-only)
-                        visited.add(neighbor)
-                        component.add(neighbor)
-                        queue.append((neighbor, hop + 1))
 
-            if len(component) >= 2:
-                self._process_network_component(list(component), node_patterns, node_detections, tg)
-                processed_nodes.update(component)
+                if len(component) >= 2:
+                    self._process_network_component(list(component), node_patterns, node_detections, tg)
+                    processed_nodes.update(component)
 
         # 4. Final quality filter
         self._apply_quality_filters(tg)
@@ -270,7 +261,7 @@ class RingManager:
 
         return core_members
 
-    def _create_network_ring(self, nodes, core_members, node_patterns, node_detections, tg):
+    def _create_network_ring(self, nodes, core_members, node_patterns, node_detections, tg, p_type=None):
         """Internal helper for creating a network-level ring."""
         ring_id = self._next_ring_id()
         all_patterns = set()
@@ -287,7 +278,10 @@ class RingManager:
 
         # Determine dominant type
         pattern_list = list(all_patterns)
-        dominant_type = sorted(pattern_list, key=lambda p: get_priority(p))[0] if pattern_list else "network"
+        if p_type:
+            dominant_type = p_type
+        else:
+            dominant_type = sorted(pattern_list, key=lambda p: get_priority(p))[0] if pattern_list else "network"
 
         # Calculate temporal consistency (Task 4/6)
         temporal_consistency = self._check_temporal_consistency(tg, set(nodes)) if tg else 0.5
@@ -330,7 +324,10 @@ class RingManager:
     # ─── Validation Checks ───────────────────────────────────
 
     def _check_temporal_consistency(self, tg, nodes: Set[str]) -> float:
-        """Check pairwise temporal overlap between ring members."""
+        """
+        Check temporal proximity/overlap between ring members.
+        Task 6/7: Support sequential behavior (A->B->C) where windows don't overlap.
+        """
         active_windows = []
         for node in nodes:
             temporal = tg.node_temporal.get(str(node), {})
@@ -339,17 +336,29 @@ class RingManager:
             if first and last:
                 active_windows.append((first, last))
 
-        if len(active_windows) < 2:
+        if not active_windows:
             return 0.5
+        if len(active_windows) < 2:
+            return 1.0
 
+        # Calculate total span of the ring
+        min_start = min(w[0] for w in active_windows)
+        max_end = max(w[1] for w in active_windows)
+        total_span_hrs = (max_end - min_start).total_seconds() / 3600
+
+        # If all nodes are active within a tight 72h window, it's highly consistent
+        if total_span_hrs <= 72:
+            return 1.0
+        
+        # Fallback to overlap ratio for long-running rings
         overlaps = 0
         total_pairs = 0
         for i in range(len(active_windows)):
             for j in range(i + 1, len(active_windows)):
                 total_pairs += 1
-                a_start, a_end = active_windows[i]
-                b_start, b_end = active_windows[j]
-                if a_start <= b_end and b_start <= a_end:
+                a_s, a_e = active_windows[i]
+                b_s, b_e = active_windows[j]
+                if a_s <= b_e and b_s <= a_e:
                     overlaps += 1
 
         return round(overlaps / max(1, total_pairs), 3)

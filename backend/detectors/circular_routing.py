@@ -33,69 +33,127 @@ def detect_circular_routing(tg) -> List[Dict[str, Any]]:
     
     subgraph = tg.G.subgraph(candidate_nodes)
     
-    # Find simple cycles with length bound
+    # Find simple cycles with length bound 3-6
     seen_cycles = set()
     cycle_id = 0
     
     try:
-        # Use Johnson's algorithm with length limit
-        for cycle in nx.simple_cycles(subgraph, length_bound=5):
+        # Use simple_cycles with length_bound=6 as per CRITICAL requirement
+        for cycle in nx.simple_cycles(subgraph, length_bound=6):
             if len(cycle) < 3:
                 continue
             
-            # Normalize cycle for dedup (start from smallest node)
+            # REJECT any ring with >50 members (indicates graph connectivity bug)
+            if len(cycle) > 50:
+                continue
+
+            # Normalize cycle for dedup
             normalized = _normalize_cycle(cycle)
             cycle_key = tuple(normalized)
             
             if cycle_key in seen_cycles:
                 continue
+            
+            # --- Strict Forensic Validation ---
+            # Sequential Timestamps + Amount Consistency
+            
+            valid_cycle = True
+            current_cycle_txs = []
+            
+            # Start search from first edge
+            u_start, v_start = cycle[0], cycle[1]
+            first_edge_txs = sorted(tg.G[u_start][v_start]["transactions"], key=lambda x: x["timestamp"])
+            
+            # We try to find ANY sequential path through the cycle
+            # Cycle can start at any node, so check all cyclic shifts
+            valid_cycle_overall = False
+            total_vol = 0
+            best_explanation = ""
+            
+            for start_idx in range(len(cycle)):
+                shifted_cycle = cycle[start_idx:] + cycle[:start_idx]
+                
+                valid_cycle = True
+                current_cycle_txs = []
+                prev_ts = None
+                cycle_amounts = []
+                cycle_start_ts = None
+                
+                for i in range(len(shifted_cycle)):
+                    u = shifted_cycle[i]
+                    v = shifted_cycle[(i + 1) % len(shifted_cycle)]
+                    
+                    edge_txs = sorted(tg.G[u][v]["transactions"], key=lambda x: x["timestamp"])
+                    
+                    best_tx = None
+                    if prev_ts is None:
+                        best_tx = edge_txs[0] if edge_txs else None
+                    else:
+                        for tx in edge_txs:
+                            if tx["timestamp"] > prev_ts:
+                                best_tx = tx
+                                break
+                    
+                    if not best_tx:
+                        valid_cycle = False
+                        break
+                    
+                    if i == 0:
+                        cycle_start_ts = best_tx["timestamp"]
+                    elif (best_tx["timestamp"] - cycle_start_ts).total_seconds() > 259200:
+                        valid_cycle = False
+                        break
+
+                    prev_ts = best_tx["timestamp"]
+                    current_cycle_txs.append(best_tx)
+                    cycle_amounts.append(best_tx["amount"])
+
+                if not valid_cycle:
+                    continue
+
+                for j in range(1, len(cycle_amounts)):
+                    prev_amt = cycle_amounts[j-1]
+                    curr_amt = cycle_amounts[j]
+                    if abs(curr_amt - prev_amt) / max(prev_amt, 1) > 0.20:
+                        valid_cycle = False
+                        break
+
+                if valid_cycle:
+                    valid_cycle_overall = True
+                    total_vol = sum(cycle_amounts)
+                    best_explanation = (
+                        f"Validated {len(cycle)}-node cycle. Funds moved sequentially through nodes "
+                        f"within {round((prev_ts - cycle_start_ts).total_seconds()/3600, 1)} hours."
+                    )
+                    break
+
+            if not valid_cycle_overall:
+                continue
+
             seen_cycles.add(cycle_key)
-            
-            # Calculate cycle metadata
-            total_amount = 0
-            amounts = []
-            timestamps = []
-            
-            for i in range(len(cycle)):
-                u = cycle[i]
-                v = cycle[(i + 1) % len(cycle)]
-                if tg.G.has_edge(u, v):
-                    edge = tg.G[u][v]
-                    total_amount += edge["total_amount"]
-                    for tx in edge["transactions"]:
-                        amounts.append(tx["amount"])
-                        timestamps.append(tx["timestamp"])
-            
-            # Amount consistency check
-            amount_consistency = 0.0
-            if amounts:
-                mean_amt = sum(amounts) / len(amounts)
-                if mean_amt > 0:
-                    variance = sum((a - mean_amt) ** 2 for a in amounts) / len(amounts)
-                    cv = (variance ** 0.5) / mean_amt
-                    amount_consistency = max(0, 1 - cv)
-            
             cycle_id += 1
+            
+            total_vol = sum(cycle_amounts)
+            
             results.append({
                 "ring_id": f"RING-CYC-{cycle_id:04d}",
-                "type": "circular_routing",
+                "type": "cycle",
                 "nodes": cycle,
                 "cycle_length": len(cycle),
-                "total_amount": round(total_amount, 2),
-                "amount_consistency": round(amount_consistency, 4),
-                "transaction_count": len(amounts),
-                "risk_score": _calculate_cycle_risk(len(cycle), amount_consistency, total_amount),
-                "explanation": f"Circular fund flow detected through {len(cycle)} accounts with "
-                              f"₹{total_amount:,.2f} total and {amount_consistency:.0%} amount consistency."
+                "total_amount": round(total_vol, 2),
+                "risk_score": _calculate_cycle_risk(len(cycle), 0.95, total_vol),
+                "explanation": (
+                    f"Validated {len(cycle)}-node cycle. Funds moved sequentially through nodes "
+                    f"within {round((prev_ts - cycle_start_ts).total_seconds()/3600, 1)} hours."
+                )
             })
             
-            # Limit cycles to prevent explosion
             if len(results) >= 500:
                 break
                 
     except Exception:
-        # Fallback: manual bounded DFS
-        results = _fallback_cycle_detection(tg, subgraph, max_length=5, max_results=500)
+        # Fallback manual DFS still respects bounds
+        results = _fallback_cycle_detection(tg, subgraph, max_length=6, max_results=500)
     
     return results
 

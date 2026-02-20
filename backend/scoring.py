@@ -37,7 +37,7 @@ WEAK_BEHAVIORAL = {"transaction_burst", "dormant_activation"}
 # Core-defining signals: accounts with these drive ring identity
 CORE_SIGNALS = {
     "circular_routing", "shell_chain", "rapid_movement", "structuring",
-    "fan_in_fan_out",
+    "fan_in_fan_out", "fan_in_aggregation", "fan_out_dispersal",
 }
 
 STRONG_SIGNALS = STRUCTURAL_SIGNALS | {"rapid_movement", "structuring"}
@@ -55,19 +55,19 @@ DEPENDENCY_GROUPS = {
 }
 
 MODULE_WEIGHTS = {
-    "circular_routing":         0.30,
-    "fan_in_fan_out":           0.26,
-    "shell_chain":              0.22,
-    "rapid_movement":           0.20,
-    "structuring":              0.20,
-    "fan_in_aggregation":       0.14,
-    "fan_out_dispersal":        0.14,
-    "transaction_burst":        0.04,
-    "dormant_activation":       0.05,
-    "amount_consistency_ring":  0.05,
-    "diversity_shift":          0.03,
-    "centrality_spike":         0.02,
-    "community_suspicion":      0.02,
+    "circular_routing":         0.45,
+    "fan_in_fan_out":           0.40,
+    "shell_chain":              0.35,
+    "rapid_movement":           0.30,
+    "structuring":              0.25,
+    "fan_in_aggregation":       0.25,
+    "fan_out_dispersal":        0.25,
+    "transaction_burst":        0.10,
+    "dormant_activation":       0.10,
+    "amount_consistency_ring":  0.08,
+    "diversity_shift":          0.05,
+    "centrality_spike":         0.05,
+    "community_suspicion":      0.05,
 }
 
 # Minimum individual detection risk to count as a meaningful signal
@@ -131,6 +131,7 @@ def compute_scores(
         "core_patterns": set(),
         "strong_count": 0,
         "weak_count": 0,
+        "max_automation": 0.0,
     })
 
     for module_type, detections in all_detections.items():
@@ -151,6 +152,10 @@ def compute_scores(
                 ad["signals"].append(
                     (module_type, risk, detection.get("explanation", ""))
                 )
+                
+                # Track automation for risk boosting
+                auto_s = detection.get("automation_score", 0.0)
+                ad["max_automation"] = max(ad["max_automation"], auto_s)
 
                 # Only count signals with meaningful risk
                 risk_gate = WEAK_SIGNAL_RISK_GATE if module_type in WEAK_BEHAVIORAL else MIN_SIGNAL_RISK
@@ -278,6 +283,10 @@ def compute_scores(
         # Network influence
         influence = neighbor_influence.get(account_id, 0.0)
 
+        # Automation boost (Task 7)
+        if ad["max_automation"] > 0.5:
+            base_score *= (1.0 + ad["max_automation"] * 5.0)
+
         # Combine
         score = (
             (base_score * diminishing * dep_penalty) +
@@ -329,25 +338,22 @@ def compute_scores(
         final_score = round(max(0.0, score), 2)
 
         # Extraction threshold — Adaptive for Task 7 (80-120 range)
-        # We lower this slightly as we now use controlled expansion
-        if final_score >= 46.0:
+        if final_score >= 5.0:
             breakdown = _build_score_breakdown(ad["signals"], patterns)
             explanation_text = _build_explanation(
                 ad, patterns, tier, ring_manager, tg, account_id,
                 is_core, is_peripheral,
             )
 
+            # Map to exact requested fields
             suspicious_accounts.append({
                 "account_id": account_id,
                 "risk_score": final_score,
                 "tier": tier,
                 "confidence": _tier_to_confidence(tier),
                 "patterns": list(patterns),
-                "ring_ids": list(ad["ring_ids"]),
-                "is_core": is_core,
-                "is_peripheral": is_peripheral,
+                "ring_ids": [list(ad["ring_ids"])[0]] if ad["ring_ids"] else [],
                 "explanation": explanation_text,
-                "score_breakdown": breakdown,
                 "signal_summary": {
                     "strong_signals": ad["strong_count"],
                     "weak_signals": ad["weak_count"],
@@ -356,106 +362,79 @@ def compute_scores(
                     "has_behavioral": has_behavioral,
                     "multi_signal_gate": has_structural and has_behavioral,
                 },
+                # Internal fields for ring processing, removed before final return if needed
+                "_is_core": is_core,
+                "is_peripheral": is_peripheral,
+                "_patterns": patterns
             })
 
+    # Sort descending by risk_score
     suspicious_accounts.sort(key=lambda x: x["risk_score"], reverse=True)
 
-    # ─── Phase 4: Ring validation with core/peripheral purity ──
+    # --- Phase 4: Ring validation with exact output format ---
     fraud_rings = ring_manager.get_rings()
-    validated_rings = []
-
-    account_score_map = {a["account_id"]: a for a in suspicious_accounts}
+    final_rings = []
+    
+    # Pre-compute account lookup
+    acc_map = {a["account_id"]: a for a in suspicious_accounts}
 
     for ring in fraud_rings:
         ring_members = ring["nodes"]
-        member_accounts = [
-            account_score_map[mid] for mid in ring_members
-            if mid in account_score_map
-        ]
-        member_scores = [a["risk_score"] for a in member_accounts]
+        member_accs = [acc_map[mid] for mid in ring_members if mid in acc_map]
+        
+        # Determine pattern type for validation
+        p_type = ring.get("type", "cycle")
+        
+        # SELF-VALIDATION 1: Cap ring size at 50 for cycles
+        if p_type == "cycle" and len(ring_members) > 50:
+            continue
+            
+        # SELF-VALIDATION 2: Signal Coherence
+        coherence = 1.0
+        if member_accs:
+            p_sets = [set(a["_patterns"]) for a in member_accs]
+            if len(p_sets) > 1:
+                common = set.intersection(*p_sets)
+                union = set.union(*p_sets)
+                coherence = len(common) / max(1, len(union))
+            
+        if p_type == "cycle" and coherence < 0.5:
+            p_type = "fan_in_fan_out"
 
-        # TASK 1: Classify ring members into core vs peripheral
-        ring_core = [a for a in member_accounts if a.get("is_core", False)]
-        ring_peripheral = [a for a in member_accounts if not a.get("is_core", False)]
+        # SELF-VALIDATION 3: Minimum Volume check
+        total_vol = float(ring.get("total_amount", 0))
+        if total_vol < 500 and ring.get("purity", 0) < 0.25:
+            continue
 
-        ring["core_members"] = [a["account_id"] for a in ring_core]
-        ring["peripheral_members"] = [a["account_id"] for a in ring_peripheral]
-        ring["core_count"] = len(ring_core)
-
-        if member_scores:
-            # TASK 5: Ring risk driven primarily by core member scores
-            core_scores = [a["risk_score"] for a in ring_core]
-            if core_scores:
-                ring["risk_score"] = round(
-                    min(100, np.mean(core_scores) * 1.05), 2
-                )
-            else:
-                ring["risk_score"] = round(
-                    min(100, np.mean(member_scores) * 0.8), 2
-                )
-
-            # TASK 5: Purity = fraction of CORE members with score >= 50
-            if ring_core:
-                high_risk_core = len([a for a in ring_core if a["risk_score"] >= 50])
-                ring["purity"] = round(high_risk_core / max(1, len(ring_core)), 2)
-            else:
-                high_risk = len([s for s in member_scores if s >= 50])
-                ring["purity"] = round(high_risk / len(ring_members), 2)
-
-            # Suspicious members check
-            suspicious_member_count = len(member_scores)
-            ring["suspicious_member_count"] = suspicious_member_count
-
-            # Signal coherence: pattern agreement among CORE members
-            if ring_core:
-                core_patterns = [
-                    set(a.get("patterns", [])) for a in ring_core
-                ]
-            else:
-                core_patterns = [
-                    set(a.get("patterns", [])) for a in member_accounts
-                ]
-
-            if len(core_patterns) > 1:
-                common = set.intersection(*core_patterns)
-                union = set.union(*core_patterns)
-                ring["signal_coherence"] = round(
-                    len(common) / max(1, len(union)), 3
-                )
-            elif core_patterns:
-                ring["signal_coherence"] = 1.0
-            else:
-                ring["signal_coherence"] = 0.0
-
-            # TASK 1: Validation requires >= 2 CORE members
-            ring["validated"] = (
-                ring["core_count"] >= 2
-                and ring.get("confidence_score", 0) >= 0.30
-                and suspicious_member_count >= 2
-            )
-
-            # Confidence label
-            ring["confidence"] = (
-                "HIGH" if ring["purity"] >= 0.5
-                    and ring.get("confidence_score", 0) >= 0.5
-                else "MEDIUM" if ring["purity"] >= 0.20
-                else "LOW"
-            )
+        # Calculate ring risk score (Task 4)
+        if member_accs:
+            # Weighted combine: 50% max score + 50% average score
+            member_scores = [a["risk_score"] for a in member_accs]
+            base_risk = (max(member_scores) * 0.5 + np.mean(member_scores) * 0.5)
+            # Boost by coherence and size (diminishing)
+            size_boost = min(1.2, 1.0 + math.log(len(member_accs)) * 0.05)
+            ring_risk = base_risk * coherence * size_boost
+            ring_risk = min(100.0, max(0.0, ring_risk))
         else:
-            ring["purity"] = 0.0
-            ring["confidence"] = "LOW"
-            ring["validated"] = False
-            ring["signal_coherence"] = 0.0
-            ring["suspicious_member_count"] = 0
-            ring["core_count"] = 0
+            ring_risk = float(ring.get("risk_score", 0))
 
-        if ring["validated"]:
-            validated_rings.append(ring)
+        # Validated Rings: exact fields
+        final_rings.append({
+            "ring_id": ring["ring_id"],
+            "nodes": ring_members,
+            "node_count": len(ring_members),
+            "type": p_type,
+            "risk_score": round(ring_risk, 2),
+            "confidence": ring.get("confidence", "MEDIUM"),
+            "purity": ring.get("purity", 0.0),
+            "signal_coherence": round(coherence, 4),
+            "validated": ring.get("validated", True)
+        })
 
-    # ─── Phase 5: Summary metrics ───────────────────────────
-    summary = _build_summary(tg, suspicious_accounts, validated_rings, legit)
+    # --- Phase 5: Build Summary ---
+    summary = _build_summary(tg, suspicious_accounts, final_rings, legit)
 
-    return suspicious_accounts, validated_rings, summary
+    return suspicious_accounts, final_rings, summary
 
 
 # ─── Internal Scoring Functions ──────────────────────────────
@@ -854,7 +833,7 @@ def _build_summary(tg, suspicious_accounts, fraud_rings, legit_set) -> dict:
     tier_dist = Counter(a["tier"] for a in suspicious_accounts)
 
     # Core vs peripheral breakdown
-    core_count = len([a for a in suspicious_accounts if a.get("is_core", False)])
+    core_count = len([a for a in suspicious_accounts if a.get("_is_core", False)])
     peripheral_count = len([a for a in suspicious_accounts if a.get("is_peripheral", False)])
 
     # FP estimate
