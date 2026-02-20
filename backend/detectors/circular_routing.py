@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 from collections import defaultdict
 
 
-def detect_circular_routing(tg) -> List[Dict[str, Any]]:
+def detect_circular_routing(tg, amount_tolerance: float = 0.20) -> List[Dict[str, Any]]:
     """
     Detect circular routing patterns (money cycles).
     
@@ -114,7 +114,7 @@ def detect_circular_routing(tg) -> List[Dict[str, Any]]:
                 for j in range(1, len(cycle_amounts)):
                     prev_amt = cycle_amounts[j-1]
                     curr_amt = cycle_amounts[j]
-                    if abs(curr_amt - prev_amt) / max(prev_amt, 1) > 0.20:
+                    if abs(curr_amt - prev_amt) / max(prev_amt, 1) > amount_tolerance:
                         valid_cycle = False
                         break
 

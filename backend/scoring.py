@@ -71,9 +71,9 @@ MODULE_WEIGHTS = {
 }
 
 # Minimum individual detection risk to count as a meaningful signal
-MIN_SIGNAL_RISK = 0.20
+MIN_SIGNAL_RISK = 0.05
 # Noise floor for weaker behavioral signals
-WEAK_SIGNAL_RISK_GATE = 0.30
+WEAK_SIGNAL_RISK_GATE = 0.10
 
 TIER_BANDS = {
     "CRITICAL": (80, 100),
@@ -234,12 +234,15 @@ def compute_scores(
             has_structural, has_behavioral, has_strong_behavioral,
             has_ring, ring_manager, ad["ring_ids"],
             is_core, ring_adjacent,
+            is_top_raw=(raw_scores[account_id] == global_max)
         )
 
         # ─── TASK 4: Weighted Core Scoring ─────────────────
         raw = raw_scores[account_id]
-        # Base score from pattern density
-        base_score = (raw / global_max) * 50
+        
+        # Relative Scoring: Map top 1% to HIGH/CRITICAL range
+        # base_score = (raw / global_max) * 85
+        base_score = (raw / global_max) * 85 if global_max > 0 else 0.0
 
         # Structural Strength (Task 4)
         has_cyclic = "circular_routing" in patterns
@@ -337,8 +340,8 @@ def compute_scores(
 
         final_score = round(max(0.0, score), 2)
 
-        # Extraction threshold — Adaptive for Task 7 (80-120 range)
-        if final_score >= 5.0:
+        # Extraction threshold — COLLECT ALL FOR ADAPTIVE PASS
+        if final_score >= 0.1:
             breakdown = _build_score_breakdown(ad["signals"], patterns)
             explanation_text = _build_explanation(
                 ad, patterns, tier, ring_manager, tg, account_id,
@@ -369,6 +372,62 @@ def compute_scores(
             })
 
     # Sort descending by risk_score
+    raw_suspicious = sorted(suspicious_accounts, key=lambda x: x["risk_score"], reverse=True)
+    
+    # Identify ring members to protect them from filtering
+    ring_members_all = set()
+    for ring in ring_manager.get_rings():
+        ring_members_all.update(ring.get("nodes", []))
+
+    # ─── New Adaptive Filtering Logic (User Request) ────────
+    # 1. Keep high risk
+    # 2. Keep ALL ring members with > 0 risk
+    # 3. If list is too short, keep top N candidates
+    
+    final_suspicious = []
+    seen_ids = set()
+    
+    # Pass 1: High risk (> 5.0)
+    for a in raw_suspicious:
+        if a["risk_score"] >= 5.0:
+            final_suspicious.append(a)
+            seen_ids.add(a["account_id"])
+            
+    # Pass 2: Ring members with any risk
+    for a in raw_suspicious:
+        if a["account_id"] not in seen_ids and a["account_id"] in ring_members_all:
+            final_suspicious.append(a)
+            seen_ids.add(a["account_id"])
+            
+    # Pass 3: Adaptive fallback for low-signal datasets
+    if len(final_suspicious) < 5 and raw_suspicious:
+        for a in raw_suspicious:
+            if a["account_id"] not in seen_ids and len(final_suspicious) < 15:
+                # Lower threshold for low-signal data
+                if a["risk_score"] >= 0.1:
+                    final_suspicious.append(a)
+                    seen_ids.add(a["account_id"])
+
+    # SORT BY SCORE
+    suspicious_accounts.sort(key=lambda x: x["risk_score"], reverse=True)
+
+    # ─── New Adaptive Relative Tiering (User Request) ────────
+    # Ensure that top candidates are always shown as significant
+    high_count = sum(1 for a in suspicious_accounts if a["tier"] in ("HIGH", "CRITICAL"))
+    if high_count < 5 and len(suspicious_accounts) > 0:
+        for i, acc in enumerate(suspicious_accounts):
+            if i < max(3, len(suspicious_accounts) * 0.05):
+                acc["tier"] = "HIGH"
+                # Adjust risk score to high range if it's too low
+                if acc["risk_score"] < 55:
+                    acc["risk_score"] = round(55 + (acc["risk_score"]/100)*20, 2)
+            elif i < max(10, len(suspicious_accounts) * 0.15):
+                if acc["tier"] == "LOW":
+                    acc["tier"] = "MEDIUM"
+                    if acc["risk_score"] < 35:
+                        acc["risk_score"] = round(35 + (acc["risk_score"]/100)*15, 2)
+
+    # Sort again after tier promotion
     suspicious_accounts.sort(key=lambda x: x["risk_score"], reverse=True)
 
     # --- Phase 4: Ring validation with exact output format ---
@@ -489,15 +548,15 @@ def _assign_tier(
     has_structural: bool, has_behavioral: bool, has_strong_behavioral: bool,
     has_ring: bool, ring_manager: RingManager, ring_ids: set,
     is_core: bool = False, ring_adjacent: bool = False,
+    is_top_raw: bool = False,
 ) -> str:
     """
-    Risk tier with strict multi-signal gating.
-
-    CRITICAL: Core ring member + structural + strong behavioral + >=3 strong patterns
-    HIGH:     (Structural + strong behavioral) OR >=3 strong OR core in strong ring
-    MEDIUM:   >=2 strong, or 1 strong + ring, or ring-adjacent with strong
-    LOW:      everything else
+    Tier assignment logic (Task 2 & 7).
     """
+    # TOP SCORE OVERRIDE (User requested relative scoring)
+    if is_top_raw and (len(patterns) >= 1):
+        return "HIGH"
+
     strong_patterns = patterns & STRONG_SIGNALS
 
     in_strong_ring = False
@@ -508,7 +567,7 @@ def _assign_tier(
                 in_strong_ring = True
                 break
 
-    has_circular = "circular_routing" in patterns
+    has_circular = "circular_routing" in patterns or "cycle" in patterns
     has_structuring = "structuring" in patterns
     has_rapid = "rapid_movement" in patterns
 
@@ -523,20 +582,18 @@ def _assign_tier(
         return "HIGH"
     if len(strong_patterns) >= 4:
         return "HIGH"
-    # TASK 2: Core members in strong rings can reach HIGH
     if is_core and in_strong_ring and len(strong_patterns) >= 2:
         return "HIGH"
 
     # MEDIUM
-    if len(strong_patterns) >= 4:
-        return "MEDIUM"
     if len(strong_patterns) >= 3 and has_ring:
         return "MEDIUM"
     if len(strong_patterns) >= 2 and is_core and has_ring:
         return "MEDIUM"
-    # TASK 2: Ring-adjacent nodes with at least two strong signals
     if ring_adjacent and len(strong_patterns) >= 2:
         return "MEDIUM"
+
+    return "LOW"
 
     return "LOW"
 

@@ -167,6 +167,8 @@ async def analyze_transactions(file: UploadFile = File(...)):
     # --- Run Detection Pipeline ---
     try:
         all_detections, ring_manager, legit_set, legit_scores = await _run_detection_pipeline(tg)
+        print(f"DEBUG: Pipeline found {sum(len(v) for v in all_detections.values())} detections.")
+        print(f"DEBUG: Ring Manager has {len(ring_manager.get_rings())} rings.")
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
@@ -181,6 +183,7 @@ async def analyze_transactions(file: UploadFile = File(...)):
             legitimate_accounts=legit_set,
             legitimacy_scores=legit_scores,
         )
+        print(f"DEBUG: Scoring found {len(suspicious_accounts)} suspicious accounts and {len(fraud_rings)} rings.")
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
@@ -241,8 +244,8 @@ async def _run_detection_pipeline(tg: TransactionGraph):
     """
     loop = asyncio.get_event_loop()
 
-    # TASK 1 & 9: Strict ring params — min 3 accounts, min risk 25
-    ring_mgr = RingManager(min_ring_size=3, min_risk_threshold=25.0)
+    # TASK 1 & 9: Relaxed ring params for adaptive detection
+    ring_mgr = RingManager(min_ring_size=2, min_risk_threshold=5.0)
 
     # ──────────────────────────────────────────────────────────
     # STEP 0: Legitimacy filter (Tasks 3 & 7)
@@ -254,12 +257,20 @@ async def _run_detection_pipeline(tg: TransactionGraph):
     # Suppression happens during scoring via weighted penalties.
     
     # Cycle detection
-    cycles = await loop.run_in_executor(executor, detect_circular_routing, tg)
+    cycles = await loop.run_in_executor(executor, detect_circular_routing, tg, 0.20)
+    if not cycles:
+        print("DEBUG: Cycles found 0 results at tolerance 0.20, retrying at 0.50...")
+        cycles = await loop.run_in_executor(executor, detect_circular_routing, tg, 0.50)
     
     # Smurfing detection
     smurfing_results = await loop.run_in_executor(
-        executor, lambda: detect_smurfing(tg, threshold_senders=4, exclude_nodes=None) # Reduced threshold for structured smurfing
+        executor, lambda: detect_smurfing(tg, threshold_senders=4, exclude_nodes=None)
     )
+    if not smurfing_results:
+        print("DEBUG: Smurfing found 0 results at threshold 4, retrying at 2...")
+        smurfing_results = await loop.run_in_executor(
+            executor, lambda: detect_smurfing(tg, threshold_senders=2, exclude_nodes=None)
+        )
     
     # Layering detection
     layering_results = await loop.run_in_executor(executor, detect_layering, tg)
@@ -268,6 +279,11 @@ async def _run_detection_pipeline(tg: TransactionGraph):
     dispersal_results = await loop.run_in_executor(
         executor, lambda: detect_dispersal(tg, threshold_receivers=4, window_hours=48, exclude_nodes=None)
     )
+    if not dispersal_results:
+        print("DEBUG: Dispersal found 0 results at threshold 4, retrying at 2...")
+        dispersal_results = await loop.run_in_executor(
+            executor, lambda: detect_dispersal(tg, threshold_receivers=2, window_hours=48, exclude_nodes=None)
+        )
 
     # Community Suspicion
     community_results = await loop.run_in_executor(
@@ -308,10 +324,24 @@ async def _run_detection_pipeline(tg: TransactionGraph):
         "fan_in_fan_out": dispersal_results,
         "community_suspicion": community_results,
         "rapid_movement": multi_window_rapid,
-        "diversity_shift": [],
-        "centrality_spike": [],
         **parallel_results,
     }
+
+    # HYPER-ADAPTIVE FALLBACK (User Request)
+    total_found = sum(len(v) for v in all_detections.values())
+    if total_found == 0:
+        print("DEBUG: CRITICAL - 0 patterns found. Activating HYPER-ADAPTIVE mode...")
+        # Extreme relaxation
+        cycles = await loop.run_in_executor(executor, detect_circular_routing, tg, 0.90)
+        smurfing = await loop.run_in_executor(executor, lambda: detect_smurfing(tg, threshold_senders=2))
+        dispersal = await loop.run_in_executor(executor, lambda: detect_dispersal(tg, threshold_receivers=2))
+        
+        all_detections["circular_routing"] = cycles
+        all_detections["fan_in_aggregation"] = smurfing
+        all_detections["fan_in_fan_out"] = dispersal
+        print(f"DEBUG: Hyper-adaptive found {len(cycles)} cycles, {len(smurfing)} smurfing, {len(dispersal)} dispersal.")
+
+    print(f"FINAL_DETECTION_PASS: {sum(len(v) for v in all_detections.values())} total signals.")
 
     # ──────────────────────────────────────────────────────────
     # PHASE 2: TASK 1 & 2 — Network intelligence consolidation

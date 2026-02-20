@@ -590,54 +590,45 @@ class RingManager:
 
     def _apply_quality_filters(self, tg=None):
         """
-        TASK 3: Strict quality filtering.
-
-        Requirements:
-        - Min 3 nodes
-        - Temporal coherence > 0.10
-        - At least one structural pattern OR confidence >= 0.45
-        - TASK 3: Minimum structural density > 0
-        - TASK 3: Reject rings formed by weak-only patterns
+        Adaptive Quality Filtering (Relative Recall Enhancement)
         """
-        to_remove = []
+        # 1. Perform strict filtering first
+        strict_valid = self._get_filtered_rings(strict=True)
+        
+        if strict_valid:
+            self.rings = strict_valid
+        else:
+            # 2. Relaxed fallback if NO rings pass strict gaze
+            relaxed_valid = self._get_filtered_rings(strict=False)
+            self.rings = relaxed_valid
 
+    def _get_filtered_rings(self, strict: bool = True) -> Dict[str, Any]:
+        valid_rings = {}
         for rid, ring in self.rings.items():
             # Size gate
-            if ring["node_count"] < self.min_ring_size:
-                to_remove.append(rid)
+            min_s = self.min_ring_size if strict else 2
+            if ring["node_count"] < min_s:
                 continue
 
-            # Temporal coherence gate
-            if ring.get("temporal_consistency", 0) < 0.10:
-                to_remove.append(rid)
+            # Temporal gate
+            min_t = 0.10 if strict else 0.0
+            if ring.get("temporal_consistency", 0) < min_t:
                 continue
 
-            # TASK 3: Reject rings formed only by weak patterns
+            # Signal gate
             patterns = set(ring.get("patterns", [ring["type"]]))
-            has_strong_pattern = bool(
-                patterns - WEAK_ONLY_PATTERNS
-            )
-            if not has_strong_pattern:
-                to_remove.append(rid)
-                continue
-
-            # Structural pattern OR high confidence
-            has_structural = bool(patterns & STRUCTURAL_PATTERNS)
-            has_structural_derived = ring["type"] in (
-                "cycle", "circular_routing", "fan_in_fan_out",
-                "fan_in_aggregation", "fan_out_dispersal",
-                "layered_chain", "shell_chain"
-            )
-
-            if not has_structural and not has_structural_derived:
-                if ring.get("confidence_score", 0) < 0.45:
-                    to_remove.append(rid)
+            if strict:
+                has_strong = bool(patterns - WEAK_ONLY_PATTERNS)
+                if not has_strong: continue
+                
+                # Structural check
+                has_struct = bool(patterns & STRUCTURAL_PATTERNS)
+                derived = ring["type"] in ("cycle", "circular_routing", "fan_in_fan_out", "fan_in_aggregation", "fan_out_dispersal", "layered_chain", "shell_chain")
+                if not has_struct and not derived and ring.get("confidence_score", 0) < 0.45:
                     continue
-
-            # TASK 3: Minimum cluster density gate
-            if ring.get("cluster_density", 0) < 0.01 and ring["node_count"] > 5:
-                to_remove.append(rid)
-                continue
+            
+            valid_rings[rid] = ring
+        return valid_rings
 
         for rid in to_remove:
             self._remove_ring(rid)
