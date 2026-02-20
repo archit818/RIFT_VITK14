@@ -1,26 +1,24 @@
 """
-Ring Manager Module v5.0
-Fraud Ring Consolidation, Deduplication, Quality Filtering & Monitoring.
+Ring Manager Module v7.0 — Network Intelligence
+Network-level fraud networks via Connected Components, High-Risk Edge Filtering.
 
-v5 Changes (Tasks 1-8):
-  - Connected-component clustering: treat detections as fragments of
-    laundering COMMUNITIES, not individual rings
-  - Multi-criteria merging: member overlap >= 40%, shared flow paths,
-    temporal overlap, graph adjacency
-  - Aggressive deduplication: each cluster gets exactly ONE ring ID
-  - Minimum quality gates: >= 3 nodes, >= 2 suspicious, structural pattern,
-    temporal coherence, amount flow
-  - Overfitting prevention: randomized threshold jitter, no hardcoded
-    synthetic-specific thresholds
-  - Performance: consolidation only runs on suspicious subgraph
+v7 Changes (Refined Architecture):
+  - Task 1: Building Fraud Networks using connected components on high-risk interaction graph.
+  - Task 2: Assigning a single Ring ID per connected network.
+  - Task 3: Identification of Core vs. Peripheral nodes inside networks.
+  - Task 6: High-risk edge selection based on temporal proximity and flow participation.
+  - Task 9: Performance optimized by running network ops only on suspicious subgraph.
 """
+
+import networkx as nx
+import pandas as pd
 
 import math
 import random
 import numpy as np
 from typing import Dict, List, Set, Any, Optional, Tuple
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 
 # Priority: lower number = higher priority
@@ -38,6 +36,20 @@ PATTERN_PRIORITY = {
 
 STRUCTURAL_PATTERNS = {"cycle", "circular_routing", "shell_chain", "layered_chain"}
 
+# Core-defining patterns for ring membership
+CORE_DEFINING_PATTERNS = {
+    "cycle", "circular_routing", "shell_chain",
+    "layered_chain", "fan_in_fan_out",
+    "fan_in_aggregation", "fan_out_dispersal",
+    "rapid_movement", "structuring",
+}
+
+# Weak patterns that alone cannot form a valid ring
+WEAK_ONLY_PATTERNS = {
+    "community_suspicion", "centrality_spike",
+    "diversity_shift", "amount_consistency_ring",
+}
+
 
 def get_priority(pattern_type: str) -> int:
     return PATTERN_PRIORITY.get(pattern_type, 5)
@@ -47,20 +59,18 @@ class RingManager:
     """
     Ring lifecycle: detect → register → consolidate → validate → output.
 
-    Key invariants:
-    - Each account belongs to at most one ring (highest priority wins).
-    - Consolidation merges overlapping detections into unified clusters.
-    - Only validated rings appear in final output.
+    Key invariants (v7):
+    - Each Ring represents exactly one coordinated Fraud Network (connected component).
+    - Rings are built from high-risk interactions (Task 6).
+    - Nodes are members of at most one network.
     """
 
     def __init__(self, min_ring_size: int = 3, min_risk_threshold: float = 25.0):
         self.account_to_ring: Dict[str, str] = {}
         self.rings: Dict[str, Dict[str, Any]] = {}
         self._ring_counter = 0
-        self.min_ring_size = max(3, min_ring_size)
+        self.min_ring_size = max(2, min_ring_size) # Relaxed for network intelligence
         self.min_risk_threshold = min_risk_threshold
-
-        # TASK 5: Small jitter to prevent overfitting to exact thresholds
         self._jitter = random.uniform(-0.02, 0.02)
 
     def _next_ring_id(self) -> str:
@@ -76,123 +86,246 @@ class RingManager:
     def get_account_ring(self, account_id: str) -> Optional[str]:
         return self.account_to_ring.get(str(account_id))
 
-    # ─── Ring Registration (Phase 1: fragment collection) ─────
+    # ─── New Workflow: Network Intelligence Pass ──────────
 
-    def add_ring(
-        self,
-        pattern_type: str,
-        nodes: List[str],
-        risk_score: float,
-        total_amount: float = 0.0,
-        explanation: str = "",
-        extra: Dict[str, Any] = None,
-        tg=None,
-    ) -> Optional[str]:
+    def build_fraud_intelligence_networks(self, tg, all_detections: Dict[str, List[Dict]]):
         """
-        Register a detected pattern as a ring fragment.
-        Lightweight validation here — heavy consolidation happens in Phase 2.
+        TASK 1, 2, 3: Aggressive Temporal Segmentation & 2-Hop Expansion.
+        Solves the Giant Component problem.
         """
-        nodes_set = set(str(n) for n in nodes)
+        self.account_to_ring = {}
+        self.rings = {}
 
-        # Basic gates
-        if len(nodes_set) < self.min_ring_size:
-            return None
-        if risk_score < self.min_risk_threshold:
-            return None
+        # 1. Gather nodes and their detection metadata
+        suspicious_nodes = set()
+        node_patterns = defaultdict(set)
+        node_detections = defaultdict(list)
 
-        new_priority = get_priority(pattern_type)
+        for module_type, detections in all_detections.items():
+            for det in detections:
+                nodes = set()
+                if "account_id" in det: nodes.add(str(det["account_id"]))
+                if "nodes" in det: nodes.update(str(n) for n in det["nodes"])
 
-        # Temporal coherence gate (reject temporally disconnected)
-        temporal_score = 1.0
-        if tg is not None:
-            temporal_score = self._check_temporal_consistency(tg, nodes_set)
-            if temporal_score < 0.12:
-                return None
+                suspicious_nodes.update(nodes)
+                for node in nodes:
+                    node_patterns[node].add(module_type)
+                    node_detections[node].append(det)
 
-        # Amount similarity
-        amount_score = self._check_amount_similarity(tg, nodes_set) if tg else 0.5
+        if not suspicious_nodes:
+            return
 
-        # Multi-hop connectivity
-        multi_hop_score = self._check_multi_hop(tg, nodes_set) if tg else 0.5
+        # 2. Build THE GLOBAL RISK GRAPH
+        global_risk_graph = nx.Graph()
+        global_risk_graph.add_nodes_from(suspicious_nodes)
+        
+        # 2a. Add edges from detections (Star Topology - Task 1)
+        for module_type, detections in all_detections.items():
+            if module_type in CORE_DEFINING_PATTERNS:
+                for det in detections:
+                    nodes = [str(n) for n in det.get("nodes", [])]
+                    hub = str(det.get("account_id")) if det.get("account_id") else (nodes[0] if nodes else None)
+                    if not hub: continue
+                    for node in nodes:
+                        if node != hub:
+                            global_risk_graph.add_edge(hub, node, weight=0.8, type="pattern")
 
-        # Signal overlap (structural patterns get higher base)
-        signal_overlap_score = 1.0 if pattern_type in STRUCTURAL_PATTERNS else 0.6
+        # 2b. Add interaction edges (Optimized O(E_suspicious) instead of O(N^2))
+        for u in suspicious_nodes:
+            # Check only neighbors in the original transaction graph
+            for v in tg.G.successors(u):
+                if v in suspicious_nodes and v != u:
+                    is_edge, weight = self._is_high_risk_edge(tg, u, v, node_patterns[u], node_patterns[v])
+                    if is_edge:
+                        global_risk_graph.add_edge(u, v, weight=weight, type="interaction")
 
-        # ─── Overlap resolution ─────────────────────────
-        overlapping_rings: Dict[str, Set[str]] = {}
-        for node in nodes_set:
-            existing_ring_id = self.account_to_ring.get(node)
-            if existing_ring_id and existing_ring_id in self.rings:
-                overlapping_rings.setdefault(existing_ring_id, set()).add(node)
+        # 3. TASK 2: Temporal Rolling Windows (72 hours)
+        processed_nodes = set()
+        core_candidates = self._identify_core_members(list(suspicious_nodes), node_patterns, tg)
+        
+        def get_safe_time(node):
+            val = tg.node_temporal.get(node, {}).get("first_seen")
+            if val is None or pd.isna(val): return pd.Timestamp("1970-01-01")
+            return pd.Timestamp(val)
 
-        # No overlap → create new
-        if not overlapping_rings:
-            return self._create_ring(
-                pattern_type, list(nodes_set), risk_score,
-                total_amount, explanation, extra,
-                temporal_score, amount_score, signal_overlap_score, multi_hop_score,
-            )
+        # Process cores chronologically
+        core_candidates.sort(key=get_safe_time)
 
-        # TASK 1: Graph-connectivity merge — absorb lower-priority overlapping rings
-        all_ovr_nodes = set().union(*overlapping_rings.values())
-
-        # If mostly covered by higher-priority rings, skip
-        higher_covered = 0
-        for rid in overlapping_rings:
-            if rid in self.rings and get_priority(self.rings[rid]["type"]) < new_priority:
-                higher_covered += len(overlapping_rings[rid])
-        if higher_covered >= len(nodes_set) * 0.6:
-            return None
-
-        # Absorb lower-priority rings with significant overlap
-        rings_to_absorb = []
-        for rid, ovr_nodes in overlapping_rings.items():
-            if rid not in self.rings:
+        for core in core_candidates:
+            if core in processed_nodes:
                 continue
-            existing = self.rings[rid]
-            existing_prio = get_priority(existing["type"])
-            existing_size = len(set(existing["nodes"]))
-            overlap_ratio = len(ovr_nodes) / max(1, existing_size)
+            
+            core_time = get_safe_time(core)
+            if core_time == pd.Timestamp("1970-01-01"): continue
 
-            # TASK 1: Merge threshold 40% for cross-priority, 50% for same
-            if existing_prio > new_priority and overlap_ratio >= 0.40:
-                rings_to_absorb.append(rid)
-            elif existing_prio == new_priority and overlap_ratio >= 0.50:
-                rings_to_absorb.append(rid)
+            # Window definition (72 hours total)
+            window_start = core_time - timedelta(hours=36)
+            window_end = core_time + timedelta(hours=36)
+            
+            # BFS 2-hop expansion restricted by time (Task 2 & 3)
+            component = {core}
+            queue = [(core, 0)]
+            visited = {core}
+            
+            while queue:
+                current, hop = queue.pop(0)
+                if hop >= 2: continue
+                
+                if current not in global_risk_graph: continue
+                for neighbor in global_risk_graph.neighbors(current):
+                    if neighbor in visited or neighbor in processed_nodes:
+                        continue
+                    
+                    n_time = get_safe_time(neighbor)
+                    if n_time != pd.Timestamp("1970-01-01"):
+                        if window_start <= n_time <= window_end:
+                            visited.add(neighbor)
+                            component.add(neighbor)
+                            queue.append((neighbor, hop + 1))
+                    else:
+                        # Nodes without time (e.g. pattern-only)
+                        visited.add(neighbor)
+                        component.add(neighbor)
+                        queue.append((neighbor, hop + 1))
 
-        if rings_to_absorb:
-            final_nodes = nodes_set.copy()
-            merged_amount = total_amount
-            merged_patterns = {pattern_type}
-            merged_explanations = [explanation] if explanation else []
-            for rid in rings_to_absorb:
-                old = self.rings[rid]
-                final_nodes.update(old["nodes"])
-                merged_amount += old.get("total_amount", 0)
-                merged_patterns.update(old.get("patterns", []))
-                merged_explanations.extend(old.get("explanations", []))
-                self._remove_ring(rid)
+            if len(component) >= 2:
+                self._process_network_component(list(component), node_patterns, node_detections, tg)
+                processed_nodes.update(component)
 
-            ring_id = self._create_ring(
-                pattern_type, list(final_nodes), risk_score,
-                merged_amount, explanation, extra,
-                temporal_score, amount_score, signal_overlap_score, multi_hop_score,
-            )
-            if ring_id:
-                self.rings[ring_id]["patterns"] = list(merged_patterns)
-                self.rings[ring_id]["explanations"] = merged_explanations[:5]
-            return ring_id
+        # 4. Final quality filter
+        self._apply_quality_filters(tg)
 
-        # Unassigned subset
-        unassigned = nodes_set - all_ovr_nodes
-        if len(unassigned) >= self.min_ring_size:
-            return self._create_ring(
-                pattern_type, list(unassigned), risk_score,
-                total_amount, explanation, extra,
-                temporal_score, amount_score, signal_overlap_score, multi_hop_score,
-            )
+    def _process_network_component(self, nodes: List[str], node_patterns, node_detections, tg):
+        """Helper to identify core and create ring for a component."""
+        core_members = self._identify_core_members(nodes, node_patterns, tg)
+        if not core_members and len(nodes) < 4:
+            return
+        self._create_network_ring(nodes, core_members, node_patterns, node_detections, tg)
 
-        return None
+    def _is_high_risk_edge(self, tg, u, v, patterns_u, patterns_v) -> Tuple[bool, float]:
+        """TASK 6: High-risk edge selection with multi-factor weighting (Task 4)."""
+        weight = 0.0
+        
+        # 1. Direct interaction check
+        has_u_to_v = tg.G.has_edge(u, v)
+        has_v_to_u = tg.G.has_edge(v, u)
+        if not (has_u_to_v or has_v_to_u):
+            return False, 0.0
+
+        # 2. Structural overlap (Task 1) - both are core-suspicious
+        shared_struct = (patterns_u & STRUCTURAL_PATTERNS) and (patterns_v & STRUCTURAL_PATTERNS)
+        if shared_struct: weight += 0.4
+        
+        # 3. Amount similarity (Task 4)
+        u_temp = tg.node_temporal.get(u, {})
+        v_temp = tg.node_temporal.get(v, {})
+        u_avg = u_temp.get("avg_amount", 0)
+        v_avg = v_temp.get("avg_amount", 0)
+        
+        if u_avg > 0 and v_avg > 0:
+            diff = abs(u_avg - v_avg) / max(u_avg, v_avg)
+            if diff < 0.05: weight += 0.5 # Stricter similarity
+            elif diff < 0.15: weight += 0.2
+            
+        # 4. Temporal Proximity (Task 2 & 4)
+        u_first = u_temp.get("first_seen")
+        v_first = v_temp.get("first_seen")
+        if u_first and v_first:
+            gap = abs((u_first - v_first).total_seconds()) / 3600 # hours
+            if gap < 6: weight += 0.3 # Tight window
+            elif gap < 48: weight += 0.1
+            
+            # TASK 2: Aggressive temporal segmentation — kill edge if gap > 10 days
+            if gap > 240 and weight < 0.8:
+                return False, 0.0
+
+        # 5. Interaction Strength (Repeat transfers)
+        tx_count = 0
+        if has_u_to_v: tx_count += len(tg.G[u][v].get('transactions', []))
+        if has_v_to_u: tx_count += len(tg.G[v][u].get('transactions', []))
+        if tx_count >= 3: weight += 0.3
+
+        # Return weighted decision
+        return (weight >= 0.6), min(1.0, weight)
+
+    def _identify_core_members(self, nodes: List[str], node_patterns: dict, tg) -> List[str]:
+        """TASK 3: Identify Core Nodes based on structural and behavioral dominance."""
+        core_members = []
+        for node in nodes:
+            patterns = node_patterns.get(node, set())
+            # Structural core signals
+            has_structural = bool(patterns & STRUCTURAL_PATTERNS)
+            has_multi_hop = "rapid_movement" in patterns
+            has_structuring = "structuring" in patterns
+
+            # Behavioral core signals
+            has_burst = "transaction_burst" in patterns
+            has_fan = bool(patterns & {"fan_in_aggregation", "fan_out_dispersal", "fan_in_fan_out"})
+
+            # Criteria: Multi-pattern OR High-priority structural
+            if (has_structural and (has_multi_hop or has_structuring or has_fan)) or len(patterns) >= 3:
+                core_members.append(node)
+            elif patterns & {"circular_routing", "shell_chain"}:
+                core_members.append(node)
+
+        return core_members
+
+    def _create_network_ring(self, nodes, core_members, node_patterns, node_detections, tg):
+        """Internal helper for creating a network-level ring."""
+        ring_id = self._next_ring_id()
+        all_patterns = set()
+        total_amount = 0
+        all_explanations = []
+
+        # Aggregate from all member detections
+        for node in nodes:
+            all_patterns.update(node_patterns.get(node, []))
+            for det in node_detections.get(node, []):
+                total_amount += det.get("total_amount", 0)
+                if "explanation" in det and det["explanation"] not in all_explanations:
+                    all_explanations.append(det["explanation"])
+
+        # Determine dominant type
+        pattern_list = list(all_patterns)
+        dominant_type = sorted(pattern_list, key=lambda p: get_priority(p))[0] if pattern_list else "network"
+
+        # Calculate temporal consistency (Task 4/6)
+        temporal_consistency = self._check_temporal_consistency(tg, set(nodes)) if tg else 0.5
+        
+        # Calculate cluster density (Task 3)
+        cluster_density = 0.0
+        if tg and len(nodes) > 1:
+            node_list = list(nodes)
+            internal_edges = sum(1 for u in node_list for v in node_list if u != v and tg.G.has_edge(u, v))
+            max_possible = len(node_list) * (len(node_list) - 1)
+            cluster_density = internal_edges / max(1, max_possible)
+
+        ring = {
+            "ring_id": ring_id,
+            "type": dominant_type,
+            "nodes": nodes,
+            "node_count": len(nodes),
+            "risk_score": 0.0, # Will be set by scoring.py
+            "total_amount": round(total_amount, 2),
+            "purity": 0.0,
+            "confidence_score": 0.6, 
+            "temporal_consistency": temporal_consistency,
+            "cluster_density": cluster_density,
+            "patterns": pattern_list,
+            "explanations": all_explanations[:8],
+            "validated": True,
+            "core_members": core_members,
+            "peripheral_members": list(set(nodes) - set(core_members)),
+            "core_count": len(core_members),
+        }
+
+        self.rings[ring_id] = ring
+        for node in nodes:
+            self.account_to_ring[node] = ring_id
+
+    # (Legacy add_ring removed in favor of network intelligence pass)
+    def add_ring(self, *args, **kwargs):
+        pass
 
     # ─── Validation Checks ───────────────────────────────────
 
@@ -247,7 +380,7 @@ class RingManager:
         return 0.2
 
     def _check_multi_hop(self, tg, nodes: Set[str]) -> float:
-        """Check internal graph connectivity (multi-hop chain structure)."""
+        """Check internal graph connectivity (structural density)."""
         if tg is None:
             return 0.5
         node_list = [str(n) for n in nodes]
@@ -266,17 +399,18 @@ class RingManager:
             return 1.0
         elif density > 0.5:
             return 0.7
-        elif density > 0.02:
+        elif density > 0.03:
             return 0.4
-        return 0.2
+        return 0.15
 
-    # ─── Ring Creation ───────────────────────────────────────
+    # ─── Ring Creation with Core/Peripheral Classification ────
 
     def _create_ring(
         self, pattern_type, nodes, risk_score,
         total_amount, explanation, extra,
         temporal_score=1.0, amount_score=1.0,
         signal_overlap_score=1.0, multi_hop_score=0.5,
+        tg=None,
     ) -> str:
         ring_id = self._next_ring_id()
         nodes = list(set(str(n) for n in nodes))
@@ -286,7 +420,6 @@ class RingManager:
         priority_factor = max(0.3, 1.0 - (prio - 1) * 0.18)
         size_factor = min(1.0, len(nodes) / 8)
 
-        # TASK 5: Jitter prevents overfitting to exact thresholds
         jitter = self._jitter
 
         confidence_score = round(
@@ -307,12 +440,25 @@ class RingManager:
         # Cluster density
         cluster_density = 0
         if len(nodes) > 1:
-            cluster_density = round(
-                len(nodes) / max(1, len(nodes) * (len(nodes) - 1)), 4
-            )
+            if tg is not None:
+                node_list = list(nodes)
+                internal_edges = sum(
+                    1 for u in node_list for v in node_list
+                    if u != v and tg.G.has_edge(u, v)
+                )
+                max_possible = len(node_list) * (len(node_list) - 1)
+                cluster_density = round(internal_edges / max(1, max_possible), 4)
+            else:
+                cluster_density = round(
+                    len(nodes) / max(1, len(nodes) * (len(nodes) - 1)), 4
+                )
 
-        # Validation gate
-        validated = confidence_score >= (0.35 + jitter)
+        # Validation gate: tighter, requires both confidence and structural signal
+        has_structural = pattern_type in STRUCTURAL_PATTERNS
+        validated = (
+            confidence_score >= (0.35 + jitter)
+            and (has_structural or confidence_score >= 0.50)
+        )
 
         ring = {
             "ring_id": ring_id,
@@ -331,6 +477,9 @@ class RingManager:
             "patterns": [pattern_type],
             "explanations": [explanation] if explanation else [],
             "validated": validated,
+            "core_members": [],
+            "peripheral_members": [],
+            "core_count": 0,
         }
         if extra:
             ring.update(extra)
@@ -350,130 +499,11 @@ class RingManager:
                 if self.account_to_ring.get(str(node)) == ring_id:
                     del self.account_to_ring[str(node)]
 
-    # ─── Phase 2: Community-based Consolidation ───────────────
+    # ─── Phase 2: Strict Consolidation ────────────────────────
 
     def consolidate_rings(self, tg=None):
-        """
-        TASK 1: Multi-criteria ring consolidation.
-
-        Strategy:
-        1. Build a "ring adjacency graph" where rings are nodes and edges
-           represent shared members, flow paths, or temporal overlap.
-        2. Find connected components in this adjacency graph.
-        3. Each connected component becomes one unified ring.
-        4. Apply quality filters to reject weak clusters.
-
-        Merge criteria (any one triggers an edge):
-        - Member overlap >= 40% (Jaccard)
-        - Shared flow paths (members directly connected in transaction graph)
-        - Temporal overlap with shared counterparties
-        """
-        if len(self.rings) <= 1:
-            return
-
-        ring_ids = list(self.rings.keys())
-        n = len(ring_ids)
-
-        # Build adjacency matrix for ring-level graph
-        adjacency = defaultdict(set)  # ring_id -> set of connected ring_ids
-
-        for i in range(n):
-            rid_a = ring_ids[i]
-            ring_a = self.rings.get(rid_a)
-            if not ring_a:
-                continue
-            nodes_a = set(ring_a["nodes"])
-
-            for j in range(i + 1, n):
-                rid_b = ring_ids[j]
-                ring_b = self.rings.get(rid_b)
-                if not ring_b:
-                    continue
-                nodes_b = set(ring_b["nodes"])
-
-                should_merge = self._should_merge_rings(
-                    ring_a, ring_b, nodes_a, nodes_b, tg
-                )
-
-                if should_merge:
-                    adjacency[rid_a].add(rid_b)
-                    adjacency[rid_b].add(rid_a)
-
-        # Find connected components (union-find)
-        components = self._find_connected_components(ring_ids, adjacency)
-
-        # Merge each component into a single ring
-        merged_ids = set()
-        for component in components:
-            if len(component) <= 1:
-                continue
-
-            # Pick the highest-priority ring as the keeper
-            sorted_rids = sorted(
-                component,
-                key=lambda rid: (
-                    get_priority(self.rings[rid]["type"]),
-                    -self.rings[rid].get("confidence_score", 0),
-                    -self.rings[rid]["node_count"],
-                )
-            )
-
-            keep_id = sorted_rids[0]
-            absorb_ids = sorted_rids[1:]
-
-            keep = self.rings[keep_id]
-            all_nodes = set(keep["nodes"])
-            all_patterns = set(keep.get("patterns", [keep["type"]]))
-            all_explanations = list(keep.get("explanations", []))
-            total_amount = keep.get("total_amount", 0)
-            max_risk = keep["risk_score"]
-            max_confidence = keep.get("confidence_score", 0)
-            max_temporal = keep.get("temporal_consistency", 0)
-
-            for rid in absorb_ids:
-                absorb = self.rings[rid]
-                all_nodes.update(absorb["nodes"])
-                all_patterns.update(absorb.get("patterns", [absorb["type"]]))
-                all_explanations.extend(absorb.get("explanations", []))
-                total_amount += absorb.get("total_amount", 0)
-                max_risk = max(max_risk, absorb["risk_score"])
-                max_confidence = max(max_confidence, absorb.get("confidence_score", 0))
-                max_temporal = max(max_temporal, absorb.get("temporal_consistency", 0))
-
-                # Reassign account mappings
-                for node in absorb["nodes"]:
-                    self.account_to_ring[str(node)] = keep_id
-
-                merged_ids.add(rid)
-
-            # Update the keeper ring
-            keep["nodes"] = list(all_nodes)
-            keep["node_count"] = len(all_nodes)
-            keep["total_amount"] = round(total_amount, 2)
-            keep["risk_score"] = round(max_risk, 2)
-            keep["patterns"] = list(all_patterns)
-            keep["explanations"] = all_explanations[:5]
-            keep["confidence_score"] = round(max_confidence, 3)
-            keep["temporal_consistency"] = round(max_temporal, 3)
-
-            # Recalculate density after merge
-            if tg and len(all_nodes) > 1:
-                node_list = list(all_nodes)
-                internal_edges = sum(
-                    1 for u in node_list for v in node_list
-                    if u != v and tg.G.has_edge(u, v)
-                )
-                max_possible = len(node_list) * (len(node_list) - 1)
-                keep["cluster_density"] = round(
-                    internal_edges / max(1, max_possible), 4
-                )
-
-        # Remove absorbed rings
-        for rid in merged_ids:
-            self.rings.pop(rid, None)
-
-        # TASK 2: Quality gate — remove rings that fail minimum criteria
-        self._apply_quality_filters(tg)
+        """Legacy placeholder for pipeline compatibility."""
+        pass
 
     def _should_merge_rings(
         self,
@@ -482,41 +512,41 @@ class RingManager:
         tg=None,
     ) -> bool:
         """
-        TASK 1: Multi-criteria merge decision.
-        Returns True if two rings should be merged.
+        TASK 3/5: Strict merging criteria.
+        REMOVED: temporal adjacency alone no longer triggers merge.
+        REMOVED: same pattern type + single shared member merge.
         """
         overlap = nodes_a & nodes_b
         union_size = len(nodes_a | nodes_b)
         jaccard = len(overlap) / max(1, union_size)
 
-        # Criterion 1: Member overlap >= 40%
-        if jaccard >= 0.40:
+        # Criterion 1: Significant member overlap (Jaccard >= 50%)
+        if jaccard >= 0.50:
             return True
 
-        # Criterion 2: High member overlap relative to smaller ring
+        # Criterion 2: High overlap relative to smaller ring (>= 60%)
         smaller_size = min(len(nodes_a), len(nodes_b))
-        if smaller_size > 0 and len(overlap) / smaller_size >= 0.50:
+        if smaller_size > 0 and len(overlap) / smaller_size >= 0.60:
             return True
 
-        # Criterion 3: Flow path adjacency (members directly connected)
-        if tg is not None and len(overlap) == 0:
+        # Criterion 3: Flow path adjacency — REQUIRE structural density
+        if tg is not None and len(overlap) >= 1:
+            # At least 1 shared member AND structural flow connections
             flow_connections = 0
-            # Sample: check if ANY node in A connects to ANY node in B
-            for u in list(nodes_a)[:15]:  # Limit for performance
+            for u in list(nodes_a)[:15]:
                 for v in list(nodes_b)[:15]:
                     if tg.G.has_edge(u, v) or tg.G.has_edge(v, u):
                         flow_connections += 1
 
-            # If many flow connections exist between the two rings
             sampled_pairs = min(15, len(nodes_a)) * min(15, len(nodes_b))
-            if sampled_pairs > 0 and flow_connections / sampled_pairs >= 0.15:
-                return True
 
-        # Criterion 4: Temporal overlap + same pattern type
-        if ring_a["type"] == ring_b["type"]:
-            # Same pattern type with any shared members
-            if len(overlap) >= 1:
-                return True
+            # TASK 3: Require >= 20% flow density (up from 15%)
+            if sampled_pairs > 0 and flow_connections / sampled_pairs >= 0.20:
+                # TASK 5: Also require at least one ring has a structural pattern
+                has_struct_a = bool(set(ring_a.get("patterns", [])) & STRUCTURAL_PATTERNS)
+                has_struct_b = bool(set(ring_b.get("patterns", [])) & STRUCTURAL_PATTERNS)
+                if has_struct_a or has_struct_b:
+                    return True
 
         return False
 
@@ -531,7 +561,6 @@ class RingManager:
             if rid in visited or rid not in self.rings:
                 continue
 
-            # BFS
             component = []
             queue = [rid]
             while queue:
@@ -552,12 +581,14 @@ class RingManager:
 
     def _apply_quality_filters(self, tg=None):
         """
-        TASK 2: Remove rings that fail minimum quality criteria.
+        TASK 3: Strict quality filtering.
 
         Requirements:
         - Min 3 nodes
         - Temporal coherence > 0.10
-        - At least one structural pattern OR confidence >= 0.35
+        - At least one structural pattern OR confidence >= 0.45
+        - TASK 3: Minimum structural density > 0
+        - TASK 3: Reject rings formed by weak-only patterns
         """
         to_remove = []
 
@@ -572,8 +603,16 @@ class RingManager:
                 to_remove.append(rid)
                 continue
 
-            # Must have structural pattern OR high confidence
+            # TASK 3: Reject rings formed only by weak patterns
             patterns = set(ring.get("patterns", [ring["type"]]))
+            has_strong_pattern = bool(
+                patterns - WEAK_ONLY_PATTERNS
+            )
+            if not has_strong_pattern:
+                to_remove.append(rid)
+                continue
+
+            # Structural pattern OR high confidence
             has_structural = bool(patterns & STRUCTURAL_PATTERNS)
             has_structural_derived = ring["type"] in (
                 "cycle", "circular_routing", "fan_in_fan_out",
@@ -582,9 +621,14 @@ class RingManager:
             )
 
             if not has_structural and not has_structural_derived:
-                if ring.get("confidence_score", 0) < 0.40:
+                if ring.get("confidence_score", 0) < 0.45:
                     to_remove.append(rid)
                     continue
+
+            # TASK 3: Minimum cluster density gate
+            if ring.get("cluster_density", 0) < 0.01 and ring["node_count"] > 5:
+                to_remove.append(rid)
+                continue
 
         for rid in to_remove:
             self._remove_ring(rid)

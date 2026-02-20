@@ -107,7 +107,7 @@ export default function PatternBreakdown({ summary, accounts }) {
                         AGGREGATED_EXPOSURE_VALUATION
                     </div>
                     <div className="font-mono" style={{ fontSize: '3rem', fontWeight: 200, color: 'var(--text-primary)' }}>
-                        ${summary.total_suspicious_amount?.toLocaleString()}
+                        ₹{summary.total_suspicious_amount?.toLocaleString('en-IN')}
                     </div>
                 </div>
             )}

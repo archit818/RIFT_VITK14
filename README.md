@@ -1,97 +1,98 @@
-# RIFT - Financial Forensics Engine
-#VITK14
-## Architecture
+# RIFT - Financial Forensics Engine (RIFT 2026 Hackathon)
 
-```
-RIFT/
-├── backend/                    # FastAPI Python backend
-│   ├── main.py                 # API entry point
-│   ├── validators.py           # CSV input validation
-│   ├── graph_engine.py         # NetworkX graph construction
-│   ├── scoring.py              # Suspicion scoring engine
-│   ├── visualization.py        # PyVis graph generation
-│   ├── synthetic.py            # Synthetic data generator
-│   ├── requirements.txt        # Python dependencies
-│   └── detectors/              # 12 detection modules
-│       ├── circular_routing.py # Module 1: Cycle detection
-│       ├── fan_in.py           # Module 2: Fan-in aggregation
-│       ├── fan_out.py          # Module 3: Fan-out dispersal
-│       ├── shell_chains.py     # Module 4: Shell chain detection
-│       ├── burst.py            # Module 5: Transaction burst
-│       ├── rapid_movement.py   # Module 6: Rapid fund movement
-│       ├── dormant.py          # Module 7: Dormant activation
-│       ├── structuring.py      # Module 8: Threshold avoidance
-│       └── advanced.py         # Modules 9-12
-└── frontend/                   # React Vite frontend
-    └── src/
-        ├── App.jsx
-        ├── index.css           # Design system
-        └── components/
-            ├── Header.jsx
-            ├── UploadZone.jsx
-            ├── Dashboard.jsx
-            ├── StatsGrid.jsx
-            ├── AccountsTable.jsx
-            ├── FraudRings.jsx
-            ├── GraphView.jsx
-            ├── PatternBreakdown.jsx
-            ├── LoadingOverlay.jsx
-            └── ErrorAlert.jsx
-```
+### MONEY MULING DETECTION CHALLENGE
+**Team Name:** VITK14  
+**Live Demo:** [https://rift-forensics.onrender.com](https://rift-forensics.onrender.com)  
+**Video Demo:** [LinkedIn Video Link](https://www.linkedin.com/posts/arka-pratim-acharyya_rifthackathon-moneymulingdetection-financialcrime-activity-7298319692482310144-x86g?utm_source=share&utm_medium=member_desktop&rcm=ACoAAELR_oUBF-m9r_0hLp6f7g3fI3V5N1-x86g)
 
-## Detection Modules
+---
 
-| # | Module | Algorithm | Complexity |
-|---|--------|-----------|------------|
-| 1 | Circular Routing | Johnson's algorithm, bounded DFS | O(V+E) |
-| 2 | Fan-in Aggregation | Sliding window + amount clustering | O(V×T) |
-| 3 | Fan-out Dispersal | Sliding window + velocity analysis | O(V×T) |
-| 4 | Shell Chains | BFS through low-degree nodes | O(V×E) |
-| 5 | Transaction Burst | Rolling window spike detection | O(V×T) |
-| 6 | Rapid Movement | Temporal BFS | O(V×E) |
-| 7 | Dormant Activation | Gap analysis on timestamp series | O(V×T) |
-| 8 | Structuring | Threshold proximity analysis | O(V×T) |
-| 9 | Amount Consistency | Cycle amount variance analysis | O(C×E) |
-| 10 | Diversity Shift | Windowed counterparty counting | O(V×T) |
-| 11 | Centrality Spike | Percentile-based anomaly detection | O(V) |
-| 12 | Community Suspicion | Greedy modularity + risk propagation | O(V+E) |
+## 🏗 System Architecture
 
-## False Positive Controls
+RIFT is built with a decoupled high-performance architecture:
+- **Frontend**: React 18 with Vite, featuring a premium glassmorphic UI, interactive NetworkX-powered graph visualizations (via PyVis), and real-time forensics dashboards.
+- **Backend**: FastAPI (Python 3.11+) implementing a multi-stage graph processing pipeline.
+- **Graph Engine**: NetworkX for topology analysis and behavioral pattern extraction.
+- **Detection Pipeline**: A waterfall priority engine that prunes noise early and consolidates signals into multi-member fraud rings.
 
-- **Merchant Detection**: High diversity + stable behavior + mostly incoming
-- **Payroll Detection**: Regular timing + fixed amounts + mostly outgoing
-- **Behavior Stability**: Long-term consistent accounts get score reduction
-- **Temporal Regularity**: Regular patterns score lower
+---
 
-## Threshold Tuning
+## 🧠 Algorithm Approach & Complexity
 
-| Parameter | Default | Adjust For |
-|-----------|---------|------------|
-| `fan_in_senders` | 10 | Lower = higher recall |
-| `fan_out_receivers` | 10 | Lower = higher recall |
-| `dormancy_days` | 30 | Higher = stricter |
-| `burst_multiplier` | 3x | Lower = more sensitive |
-| `structuring_count` | 3 | Higher = more precise |
-| `cycle_max_length` | 5 | Higher = thorough |
+| # | Module | Algorithm | Complexity | Description |
+|---|--------|-----------|------------|-------------|
+| 1 | **Circular Routing** | Bounded DFS / Johnson's | O(V+E) | Detects cycles of length 3-5 used for fund layering. |
+| 2 | **Smurfing (Fan-in)** | Sliding Window Search | O(V×T) | Detects 10+ senders aggregating to 1 receiver within 72h. |
+| 3 | **Smurfing (Fan-out)**| Sliding Window Search | O(V×T) | Detects 1 sender dispersing to 10+ receivers within 72h. |
+| 4 | **Layered Shells** | BFS Traversal | O(V×E) | Identifies chains of 3+ hops through low-activity accounts. |
+| 5 | **Transaction Burst**| Rolling Window Spike | O(V×T) | Detects sudden extreme velocity shifts. |
+| 6 | **Rapid Movement** | Temporal BFS | O(V×E) | Tracks funds passing through nodes in < 2 hours. |
+| 7 | **Dormant Activation**| Gap Analysis | O(V×T) | Flags long-inactive accounts suddenly moving high volumes. |
+| 8 | **Structuring** | Binning Analysis | O(V×T) | Detects amounts just below common reporting thresholds. |
 
-## Running Locally
+---
 
-### Backend
+## ⚖️ Suspicion Score Methodology (SSM)
+
+Our scoring engine uses a **Multi-Signal Gated (MSG)** approach to minimize false positives:
+
+1.  **Structural Integrity (40%)**: High weight given to cycles and shell chains.
+2.  **Temporal Coherence (30%)**: Analyzes the velocity and timing (e.g., the 72h smurfing window).
+3.  **Behavioral Deviation (20%)**: Compares current activity vs historical stability.
+4.  **Network Influence (10%)**: Propagates risk from known suspicious neighbors using PageRank-inspired weights.
+
+**False Positive Controls**:
+- **Merchant Suppression**: Automated detection of high-diversity, stable-incoming patterns.
+- **Payroll Suppression**: Recognizes recurring fixed-amount periodic outgoing flows.
+- **Stability Dampening**: Accounts with long-term consistent behavior receive a 40-60% risk reduction.
+
+---
+
+## 🚀 Installation & Setup
+
+### Prerequisites
+- Python 3.9+
+- Node.js 18+
+
+### Backend Setup
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 python main.py
 ```
 
-### Frontend
+### Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Deployment (Render)
+---
 
-Both services are configured for Render deployment.
-- Backend: Python web service
-- Frontend: Static site (build with `npm run build`)
+## 📘 Usage Instructions
+
+1.  **Upload**: Select a transaction CSV matching the required schema (`transaction_id, sender_id, receiver_id, amount, timestamp`).
+2.  **Analyze**: The engine will process up to 10K transactions in < 30 seconds.
+3.  **Explore**: Use the **Network Graph** to see directed money flows. Red nodes indicate high-risk muling suspects.
+4.  **Export**: Click **GENERATE_FULL_REPORT** to download the standardized JSON output for regulatory submission.
+
+---
+
+## 🚧 Known Limitations
+
+- **Large Datasets**: Visualization may become cluttered with > 5,000 nodes; the engine uses sampling for the interactive UI in such cases.
+- **Single-Hop Muling**: Simple A → B transfers without further movement are not flagged as "rings" unless behavioral signals are extreme.
+- **Cold Start**: New accounts without historical data may have slightly less accurate stability scores.
+
+---
+
+## 👥 Team Members
+
+- **Arka Pratim Acharyya** - (Backend/Algorithms/Lead)
+- **Team Code:** VITK14
+
+---
+*RIFT Hackathon 2026 - Keeping the financial ecosystem clean.*

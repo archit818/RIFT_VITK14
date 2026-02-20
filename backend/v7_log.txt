@@ -1,0 +1,47 @@
+Generating test data...
+Running analysis via file upload...
+
+=== RIFT v7.0 METRICS ===
+Accounts Analyzed:    434
+Suspicious Flagged:   131
+Fraud Rings:          24
+Estimated Precision:  0.847
+Avg Ring Purity:      1.000
+Processing Time:      17.14s
+
+Ring Details:
+  Ring 0: 31 nodes, 24 cores, Type: circular_routing, Risk: 64.26
+  Ring 1: 3 nodes, 2 cores, Type: circular_routing, Risk: 58.24
+  Ring 2: 3 nodes, 2 cores, Type: circular_routing, Risk: 60.24
+  Ring 3: 7 nodes, 5 cores, Type: circular_routing, Risk: 60.52
+  Ring 4: 5 nodes, 3 cores, Type: circular_routing, Risk: 60.7
+  Ring 5: 4 nodes, 3 cores, Type: circular_routing, Risk: 58.24
+  Ring 6: 4 nodes, 3 cores, Type: circular_routing, Risk: 61.18
+  Ring 7: 3 nodes, 2 cores, Type: circular_routing, Risk: 71.37
+  Ring 8: 5 nodes, 4 cores, Type: circular_routing, Risk: 59.42
+  Ring 9: 3 nodes, 3 cores, Type: circular_routing, Risk: 58.24
+  Ring 10: 3 nodes, 2 cores, Type: circular_routing, Risk: 58.24
+  Ring 11: 3 nodes, 2 cores, Type: circular_routing, Risk: 78.73
+  Ring 12: 8 nodes, 6 cores, Type: circular_routing, Risk: 59.64
+  Ring 13: 4 nodes, 3 cores, Type: circular_routing, Risk: 58.8
+  Ring 14: 3 nodes, 2 cores, Type: circular_routing, Risk: 58.24
+  Ring 15: 3 nodes, 3 cores, Type: circular_routing, Risk: 66.99
+  Ring 16: 8 nodes, 7 cores, Type: circular_routing, Risk: 64.6
+  Ring 17: 3 nodes, 2 cores, Type: circular_routing, Risk: 80.52
+  Ring 18: 3 nodes, 3 cores, Type: circular_routing, Risk: 75.95
+  Ring 19: 5 nodes, 5 cores, Type: circular_routing, Risk: 92.84
+  Ring 20: 3 nodes, 3 cores, Type: circular_routing, Risk: 84.49
+  Ring 21: 4 nodes, 2 cores, Type: circular_routing, Risk: 100
+  Ring 22: 4 nodes, 2 cores, Type: circular_routing, Risk: 84.49
+  Ring 23: 3 nodes, 2 cores, Type: circular_routing, Risk: 84.49
+
+Tier Distribution:
+  CRITICAL: 25
+  HIGH: 86
+  MEDIUM: 20
+  LOW: 0
+
+=== VALIDATION ===
+[PASS] Suspicious Node Range (80-120)
+[PASS] Ring Count Range (10-25)
+[PASS] Precision (>0.70)

@@ -1,15 +1,15 @@
 export default function StatsGrid({ summary }) {
     const stats = [
         {
-            value: summary.total_accounts_analyzed?.toLocaleString() || '0',
+            value: summary.total_accounts_analyzed?.toLocaleString('en-IN') || '0',
             label: 'Accounts Analyzed',
         },
         {
-            value: summary.total_transactions_analyzed?.toLocaleString() || '0',
+            value: summary.total_transactions_analyzed?.toLocaleString('en-IN') || '0',
             label: 'Transactions',
         },
         {
-            value: summary.suspicious_accounts_found || 0,
+            value: summary.suspicious_accounts_flagged || 0,
             label: 'Deceptive Nodes',
         },
         {

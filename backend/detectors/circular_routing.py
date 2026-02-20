@@ -86,7 +86,7 @@ def detect_circular_routing(tg) -> List[Dict[str, Any]]:
                 "transaction_count": len(amounts),
                 "risk_score": _calculate_cycle_risk(len(cycle), amount_consistency, total_amount),
                 "explanation": f"Circular fund flow detected through {len(cycle)} accounts with "
-                              f"${total_amount:,.2f} total and {amount_consistency:.0%} amount consistency."
+                              f"₹{total_amount:,.2f} total and {amount_consistency:.0%} amount consistency."
             })
             
             # Limit cycles to prevent explosion
@@ -114,8 +114,8 @@ def _calculate_cycle_risk(length: int, consistency: float, total_amount: float) 
     length_score = {3: 0.9, 4: 0.7, 5: 0.5}.get(length, 0.3)
     # High consistency = more suspicious
     consistency_score = consistency
-    # Higher amounts = more risk
-    amount_score = min(1.0, total_amount / 100000)
+    # Higher amounts = more risk (Scale for Rupee)
+    amount_score = min(1.0, total_amount / 8000000)
     
     return round(
         length_score * 0.4 + consistency_score * 0.4 + amount_score * 0.2,

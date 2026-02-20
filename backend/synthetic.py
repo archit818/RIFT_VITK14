@@ -50,8 +50,9 @@ def generate_synthetic_data(
         while receiver == sender:
             receiver = random.choice(accounts[:int(num_accounts * 0.8)])
         
-        amount = round(np.random.lognormal(mean=6, sigma=1.5), 2)
-        amount = max(1, min(amount, 500000))
+        # Scale amounts for Rupees (roughly 80x USD, but using lognormal parameter shift)
+        amount = round(np.random.lognormal(mean=10.5, sigma=1.5), 2)
+        amount = max(100, min(amount, 50000000))
         
         ts = base_time + timedelta(
             seconds=random.randint(0, int(time_span.total_seconds()))
@@ -73,7 +74,7 @@ def generate_synthetic_data(
         ring_size = random.choice([3, 4, 5])
         ring = random.sample(ring_accounts, min(ring_size, len(ring_accounts)))
         
-        ring_amount = round(random.uniform(5000, 50000), 2)
+        ring_amount = round(random.uniform(400000, 4000000), 2)
         ring_time = base_time + timedelta(days=random.randint(30, 150))
         
         for i in range(len(ring)):
@@ -101,7 +102,7 @@ def generate_synthetic_data(
         
         for sender in senders:
             tx_id += 1
-            amount = round(random.uniform(1000, 9500), 2)
+            amount = round(random.uniform(80000, 760000), 2)
             ts = fan_in_time + timedelta(hours=random.randint(0, 48))
             
             transactions.append({
@@ -121,7 +122,7 @@ def generate_synthetic_data(
         
         for receiver in receivers:
             tx_id += 1
-            amount = round(random.uniform(500, 5000), 2)
+            amount = round(random.uniform(40000, 400000), 2)
             ts = fan_out_time + timedelta(hours=random.randint(0, 12))
             
             transactions.append({
@@ -141,7 +142,7 @@ def generate_synthetic_data(
         
         for i in range(8):
             tx_id += 1
-            amount = round(random.uniform(9000, 9900), 2)  # Just below $10,000
+            amount = round(random.uniform(45000, 49500), 2)  # Just below ₹50,000 PAN threshold
             ts = struct_time + timedelta(days=i * random.randint(1, 3))
             
             transactions.append({
@@ -160,7 +161,7 @@ def generate_synthetic_data(
         chain = random.sample(shell_accounts, min(chain_length, len(shell_accounts)))
         
         chain_time = base_time + timedelta(days=random.randint(40, 140))
-        chain_amount = round(random.uniform(10000, 80000), 2)
+        chain_amount = round(random.uniform(800000, 6400000), 2)
         
         for i in range(len(chain) - 1):
             tx_id += 1
@@ -198,7 +199,7 @@ def generate_synthetic_data(
                 "transaction_id": f"TX-{tx_id:08d}",
                 "sender_id": dormant,
                 "receiver_id": random.choice(accounts[:100]),
-                "amount": round(random.uniform(2000, 15000), 2),
+                "amount": round(random.uniform(160000, 1200000), 2),
                 "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
             })
     

@@ -129,6 +129,8 @@ def generate_visualization(
         score = acc_info["risk_score"] if acc_info else 0
         patterns = acc_info.get("patterns", []) if acc_info else []
         ring_ids = acc_info.get("ring_ids", []) if acc_info else []
+        is_core = acc_info.get("is_core", False) if acc_info else False
+        is_peripheral = acc_info.get("is_peripheral", False) if acc_info else False
         
         # Color based on risk score
         if score >= 70:
@@ -146,6 +148,8 @@ def generate_visualization(
         
         # Size based on score
         size = max(10, min(40, 10 + score * 0.3))
+        if is_core:
+            size *= 1.3
         
         # Border color for ring membership
         border_color = ring_color_map.get(
@@ -153,8 +157,10 @@ def generate_visualization(
         )
         
         # Tooltip
+        role = "CORE MEMBER" if is_core else ("PERIPHERAL MEMBER" if is_peripheral else "EXTERNAL")
         tooltip_lines = [
             f"<b>Account:</b> {node}",
+            f"<b>Role:</b> {role}",
             f"<b>Risk Score:</b> {score:.1f}/100",
         ]
         if patterns:
@@ -163,6 +169,8 @@ def generate_visualization(
             tooltip_lines.append(f"<b>Ring:</b> {', '.join(ring_ids[:3])}")
         
         tooltip = "<br>".join(tooltip_lines)
+        
+        in_ring = node in ring_membership
         
         net.add_node(
             node,
@@ -174,6 +182,8 @@ def generate_visualization(
                 "highlight": {"background": "#FFFFFF", "border": border_color}
             },
             size=size,
+            borderWidth=7 if is_core else (4 if in_ring else 2),
+            borderWidthSelected=9 if is_core else (6 if in_ring else 4),
             group=group,
         )
     

@@ -27,7 +27,7 @@ def detect_shell_chains(tg, min_path_length: int = 3, max_path_length: int = 6) 
     for node in tg.G.nodes():
         total_degree = tg.in_degree.get(node, 0) + tg.out_degree.get(node, 0)
         tx_count = tg.node_temporal.get(node, {}).get("tx_count", 0)
-        if total_degree <= 3 and tx_count <= 5:
+        if total_degree <= 3 and tx_count <= 3:
             shell_candidates.add(node)
     
     if not shell_candidates:
@@ -98,7 +98,7 @@ def detect_shell_chains(tg, min_path_length: int = 3, max_path_length: int = 6) 
                                 "explanation": (
                                     f"Layered chain of {len(new_path)} accounts with "
                                     f"{len(shell_intermediates)} shell intermediaries. "
-                                    f"Total flow: ${total_amount:,.2f}."
+                                    f"Total flow: ₹{total_amount:,.2f}."
                                 )
                             })
                 
@@ -112,7 +112,7 @@ def _calculate_shell_risk(path_length, shell_count, total_amount):
     """Calculate risk score for shell chain."""
     length_score = min(1.0, path_length / 6)
     shell_ratio = shell_count / max(path_length - 2, 1)
-    amount_score = min(1.0, total_amount / 200000)
+    amount_score = min(1.0, total_amount / 16000000)
     
     risk = length_score * 0.3 + shell_ratio * 0.4 + amount_score * 0.3
     return round(min(1.0, risk), 4)

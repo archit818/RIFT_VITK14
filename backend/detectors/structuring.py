@@ -8,8 +8,8 @@ from typing import List, Dict, Any
 from collections import Counter
 
 
-# Common regulatory thresholds
-REGULATORY_THRESHOLDS = [10000, 5000, 3000, 15000, 50000]
+# Common Indian regulatory thresholds (PAN/Income Tax/Laundering)
+REGULATORY_THRESHOLDS = [50000, 100000, 200000, 500000, 1000000]
 THRESHOLD_MARGIN = 0.15  # 15% below threshold
 
 
@@ -80,7 +80,7 @@ def detect_structuring(tg, min_count: int = 3) -> List[Dict[str, Any]]:
             "risk_score": risk,
             "explanation": (
                 f"Account {node} has {best_pattern['count']} transactions near "
-                f"${best_pattern['threshold']:,} threshold (avg ${best_pattern['avg_amount']:,.2f}). "
+                f"₹{best_pattern['threshold']:,} threshold (avg ₹{best_pattern['avg_amount']:,.2f}). "
                 f"Clustering: {best_pattern['clustering']:.0%}."
             )
         })

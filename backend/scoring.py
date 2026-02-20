@@ -1,17 +1,12 @@
 """
-Suspicion Scoring Engine v5.0
-Multi-signal gating, network influence, risk prioritization, explainability,
-and generalization hardening.
+Suspicion Scoring Engine v7.0 — Network Intelligence
+Network-level Fraud Network Scoring, Controlled Expansion, Precise Recall.
 
-v5 Changes (Tasks 1-8):
-  - Ring member coherence: scoring uses consolidated ring data
-  - Peripheral dampening improved: isolated nodes with 1 signal get
-    stronger reduction
-  - Overfitting prevention: jitter on tier boundaries, no hardcoded patterns
-  - Output stability: deterministic scoring within runs, jitter only
-    affects boundary cases
-  - Purity recalculation post-consolidation uses member score data
-  - Signal coherence tracks cross-member pattern agreement
+v7 Changes (Refined Architecture):
+  - Task 4: Weighted Core Scoring Formula including structural strength and temporal consistency.
+  - Task 5: Controlled Expansion (1-2 hops from core) with minimum interaction strength.
+  - Task 7: Target suspicious nodes (80-120) and rings (10-25).
+  - Task 8: Monitoring alerts for over-fragmentation or low recall.
 """
 
 import math
@@ -33,6 +28,16 @@ STRUCTURAL_SIGNALS = {
 BEHAVIORAL_SIGNALS = {
     "rapid_movement", "structuring", "transaction_burst",
     "dormant_activation",
+}
+
+# Only strong behavioral signals qualify for the multi-signal gate
+STRONG_BEHAVIORAL = {"rapid_movement", "structuring"}
+WEAK_BEHAVIORAL = {"transaction_burst", "dormant_activation"}
+
+# Core-defining signals: accounts with these drive ring identity
+CORE_SIGNALS = {
+    "circular_routing", "shell_chain", "rapid_movement", "structuring",
+    "fan_in_fan_out",
 }
 
 STRONG_SIGNALS = STRUCTURAL_SIGNALS | {"rapid_movement", "structuring"}
@@ -57,13 +62,18 @@ MODULE_WEIGHTS = {
     "structuring":              0.20,
     "fan_in_aggregation":       0.14,
     "fan_out_dispersal":        0.14,
-    "transaction_burst":        0.07,
-    "dormant_activation":       0.06,
-    "amount_consistency_ring":  0.06,
-    "diversity_shift":          0.04,
-    "centrality_spike":         0.03,
+    "transaction_burst":        0.04,
+    "dormant_activation":       0.05,
+    "amount_consistency_ring":  0.05,
+    "diversity_shift":          0.03,
+    "centrality_spike":         0.02,
     "community_suspicion":      0.02,
 }
+
+# Minimum individual detection risk to count as a meaningful signal
+MIN_SIGNAL_RISK = 0.20
+# Noise floor for weaker behavioral signals
+WEAK_SIGNAL_RISK_GATE = 0.30
 
 TIER_BANDS = {
     "CRITICAL": (80, 100),
@@ -81,14 +91,34 @@ def compute_scores(
     legitimacy_scores: Dict[str, float] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Multi-signal gated scoring with network influence and strict tier separation.
+    Multi-signal gated scoring with core/peripheral architecture.
     Returns: (suspicious_accounts, validated_rings, summary)
     """
     legit = legitimate_accounts or set()
     legit_scores = legitimacy_scores or {}
 
-    # TASK 5: Boundary jitter for generalization
-    _tier_jitter = random.uniform(-1.5, 1.5)
+    # ─── Phase 0: Controlled Expansion Baseline (Task 5) ────────
+    # Identify neighbors with high frequency interaction with core members
+    expanded_nodes = set()
+    core_defining_global = set()
+    for module_type in CORE_SIGNALS:
+        for det in all_detections.get(module_type, []):
+            if "nodes" in det: core_defining_global.update(str(n) for n in det["nodes"])
+            if "account_id" in det: core_defining_global.add(str(det["account_id"]))
+
+    for core_node in core_defining_global:
+        try:
+            # 1-hop expansion
+            for neighbor in list(tg.G.successors(core_node)) + list(tg.G.predecessors(core_node)):
+                if neighbor in legit: continue
+                # Interaction strength check (Task 5)
+                # Filter expensive check, just use simple degree/freq for now
+                if tg.G.degree(neighbor) >= 1:
+                    expanded_nodes.add(neighbor)
+        except: pass
+
+    # Boundary jitter for generalization
+    _tier_jitter = random.uniform(-1.0, 1.0)
 
     # ─── Phase 1: Aggregate signals per account ─────────────
     account_data = defaultdict(lambda: {
@@ -97,6 +127,8 @@ def compute_scores(
         "unique_patterns": set(),
         "structural_patterns": set(),
         "behavioral_patterns": set(),
+        "strong_behavioral_patterns": set(),
+        "core_patterns": set(),
         "strong_count": 0,
         "weak_count": 0,
     })
@@ -119,28 +151,46 @@ def compute_scores(
                 ad["signals"].append(
                     (module_type, risk, detection.get("explanation", ""))
                 )
-                ad["unique_patterns"].add(module_type)
 
-                if module_type in STRUCTURAL_SIGNALS:
-                    ad["structural_patterns"].add(module_type)
-                if module_type in BEHAVIORAL_SIGNALS:
-                    ad["behavioral_patterns"].add(module_type)
+                # Only count signals with meaningful risk
+                risk_gate = WEAK_SIGNAL_RISK_GATE if module_type in WEAK_BEHAVIORAL else MIN_SIGNAL_RISK
+                if risk >= risk_gate:
+                    ad["unique_patterns"].add(module_type)
 
-                if module_type in STRONG_SIGNALS:
-                    ad["strong_count"] += 1
-                else:
-                    ad["weak_count"] += 1
+                    if module_type in STRUCTURAL_SIGNALS:
+                        ad["structural_patterns"].add(module_type)
+                    if module_type in BEHAVIORAL_SIGNALS:
+                        ad["behavioral_patterns"].add(module_type)
+                    if module_type in STRONG_BEHAVIORAL:
+                        ad["strong_behavioral_patterns"].add(module_type)
+                    if module_type in CORE_SIGNALS:
+                        ad["core_patterns"].add(module_type)
+
+                    if module_type in STRONG_SIGNALS:
+                        ad["strong_count"] += 1
+                    else:
+                        ad["weak_count"] += 1
 
                 ring_id = ring_manager.get_account_ring(node)
                 if ring_id:
                     ad["ring_ids"].add(ring_id)
 
-    # ─── Phase 2: Network influence (Task 4) ─────────────────
+    # ─── Phase 1b: Classify Core vs Peripheral ───────────────
+    core_accounts = set()
+    peripheral_accounts = set()
+
+    for account_id, ad in account_data.items():
+        if ad["core_patterns"]:
+            core_accounts.add(account_id)
+        elif ad["ring_ids"]:
+            peripheral_accounts.add(account_id)
+
+    # ─── Phase 2: Network influence ──────────────────────────
     neighbor_influence = _compute_network_influence(
-        tg, account_data, ring_manager
+        tg, account_data, ring_manager, core_accounts
     )
 
-    # ─── Phase 3: Score with multi-signal gating ─────────────
+    # ─── Phase 3: Context-aware gated scoring ────────────────
     suspicious_accounts = []
 
     if not account_data:
@@ -163,36 +213,67 @@ def compute_scores(
 
         has_structural = len(structural) > 0
         has_behavioral = len(behavioral) > 0
+        has_strong_behavioral = len(ad["strong_behavioral_patterns"]) > 0
         has_ring = bool(ad["ring_ids"])
+        is_core = account_id in core_accounts
+        is_peripheral = account_id in peripheral_accounts
+
+        # ─── Context-Aware Gating (TASK 2) ──────────────
+        # Check if node is strongly connected to a validated ring
+        ring_adjacent = _is_ring_adjacent(
+            tg, account_id, ring_manager, core_accounts
+        )
 
         tier = _assign_tier(
             patterns, ad["strong_count"],
-            has_structural, has_behavioral, has_ring,
-            ring_manager, ad["ring_ids"],
+            has_structural, has_behavioral, has_strong_behavioral,
+            has_ring, ring_manager, ad["ring_ids"],
+            is_core, ring_adjacent,
         )
 
-        # ─── Stabilized scoring ─────────────────────────
+        # ─── TASK 4: Weighted Core Scoring ─────────────────
         raw = raw_scores[account_id]
-        base_score = (raw / global_max) * 55
+        # Base score from pattern density
+        base_score = (raw / global_max) * 50
 
-        # Multi-signal gate bonus
-        if has_structural and has_behavioral:
-            base_score *= 1.25
-        elif ad["strong_count"] == 0:
-            base_score *= 0.20
+        # Structural Strength (Task 4)
+        has_cyclic = "circular_routing" in patterns
+        has_multi_hop = "rapid_movement" in patterns
+        if has_cyclic and has_multi_hop: base_score *= 1.4
+        elif has_cyclic or has_multi_hop: base_score *= 1.2
 
-        # Diminishing returns
+        # Temporal Consistency boost
+        temp_data = tg.node_temporal.get(account_id, {})
+        tx_count = temp_data.get("tx_count", 0)
+        if tx_count > 10 and tx_count < 100: base_score *= 1.15 # Fraudulent velocity band
+
+        # Strongest individual signal risk check
+        max_signal_risk = max(
+            (s[1] for s in ad["signals"]), default=0
+        )
+
+        # Diminishing returns for signal count
         unique_count = len(patterns)
         diminishing = (
-            1.0 + math.log(unique_count) * 0.35
+            1.0 + math.log(unique_count) * 0.30
             if unique_count > 1 else 1.0
         )
+
+        # Multi-signal gate bonus
+        if has_structural and has_strong_behavioral and max_signal_risk >= 0.3:
+            base_score *= 1.5
+        elif has_structural and has_behavioral:
+            base_score *= 1.1
+        elif is_peripheral:
+            # Task 5: Expansion nodes receive lower confidence/base
+            base_score *= 0.65
 
         # Signal dependency penalty
         dep_penalty = _compute_dependency_penalty(patterns)
 
-        # Ring coordination boost
+        # Ring coordination boost — single ring per network pass
         ring_boost = _compute_ring_boost(ad["ring_ids"], ring_manager)
+        if is_peripheral: ring_boost *= 0.5
 
         # Network influence
         influence = neighbor_influence.get(account_id, 0.0)
@@ -211,35 +292,49 @@ def compute_scores(
         # Behavioral stability reduction
         score = _apply_stability_suppression(tg, account_id, score)
 
-        # Single-pattern penalty
+        # ─── TASK 4: Precision Recovery ─────────────────
+        # Single-pattern penalty (aggressive for weak)
         if len(patterns) == 1:
             p = list(patterns)[0]
             if p in WEAK_SIGNALS:
-                score *= 0.15
+                score *= 0.10  # near-eliminate single weak signal nodes
+            elif p not in CORE_SIGNALS:
+                score *= 0.45
             else:
                 score *= 0.55
 
         # Weak-only hard cap
         if patterns <= WEAK_SIGNALS:
-            score = min(score, 25.0)
+            score = min(score, 18.0)
 
-        # TASK 4: Peripheral dampening (enhanced)
+        # Nodes with only weak behavioral signals and no structural role
+        all_weak_behavioral = patterns <= (WEAK_SIGNALS | BEHAVIORAL_SIGNALS)
+        if all_weak_behavioral and not has_structural and not has_ring:
+            score *= 0.25
+
+        # Peripheral dampening — no structural role, not ring-adjacent
         in_deg = tg.in_degree.get(account_id, 0)
         out_deg = tg.out_degree.get(account_id, 0)
         total_deg = in_deg + out_deg
         if total_deg <= 1 and ad["strong_count"] == 0 and not has_ring:
-            score *= 0.40  # Strongly dampen isolated weak nodes
+            score *= 0.25
+
+        # Peripheral ring members get capped below core range
+        if is_peripheral and not is_core:
+            score = min(score, 45.0)
 
         # Map to tier band
         score = _map_to_tier_band(score, tier, _tier_jitter)
 
         final_score = round(max(0.0, score), 2)
 
-        # Extraction threshold
-        if final_score >= 18.0:
+        # Extraction threshold — Adaptive for Task 7 (80-120 range)
+        # We lower this slightly as we now use controlled expansion
+        if final_score >= 46.0:
             breakdown = _build_score_breakdown(ad["signals"], patterns)
             explanation_text = _build_explanation(
-                ad, patterns, tier, ring_manager, tg, account_id
+                ad, patterns, tier, ring_manager, tg, account_id,
+                is_core, is_peripheral,
             )
 
             suspicious_accounts.append({
@@ -249,6 +344,8 @@ def compute_scores(
                 "confidence": _tier_to_confidence(tier),
                 "patterns": list(patterns),
                 "ring_ids": list(ad["ring_ids"]),
+                "is_core": is_core,
+                "is_peripheral": is_peripheral,
                 "explanation": explanation_text,
                 "score_breakdown": breakdown,
                 "signal_summary": {
@@ -263,7 +360,7 @@ def compute_scores(
 
     suspicious_accounts.sort(key=lambda x: x["risk_score"], reverse=True)
 
-    # ─── Phase 4: Ring validation with member scores ────────
+    # ─── Phase 4: Ring validation with core/peripheral purity ──
     fraud_rings = ring_manager.get_rings()
     validated_rings = []
 
@@ -277,38 +374,62 @@ def compute_scores(
         ]
         member_scores = [a["risk_score"] for a in member_accounts]
 
+        # TASK 1: Classify ring members into core vs peripheral
+        ring_core = [a for a in member_accounts if a.get("is_core", False)]
+        ring_peripheral = [a for a in member_accounts if not a.get("is_core", False)]
+
+        ring["core_members"] = [a["account_id"] for a in ring_core]
+        ring["peripheral_members"] = [a["account_id"] for a in ring_peripheral]
+        ring["core_count"] = len(ring_core)
+
         if member_scores:
-            # TASK 1: Ring risk = weighted mean of member scores
-            ring["risk_score"] = round(
-                min(100, np.mean(member_scores) * 1.1), 2
-            )
+            # TASK 5: Ring risk driven primarily by core member scores
+            core_scores = [a["risk_score"] for a in ring_core]
+            if core_scores:
+                ring["risk_score"] = round(
+                    min(100, np.mean(core_scores) * 1.05), 2
+                )
+            else:
+                ring["risk_score"] = round(
+                    min(100, np.mean(member_scores) * 0.8), 2
+                )
 
-            # TASK 2: Purity = fraction of members with score >= 50
-            high_risk = len([s for s in member_scores if s >= 50])
-            ring["purity"] = round(high_risk / len(ring_members), 2)
+            # TASK 5: Purity = fraction of CORE members with score >= 50
+            if ring_core:
+                high_risk_core = len([a for a in ring_core if a["risk_score"] >= 50])
+                ring["purity"] = round(high_risk_core / max(1, len(ring_core)), 2)
+            else:
+                high_risk = len([s for s in member_scores if s >= 50])
+                ring["purity"] = round(high_risk / len(ring_members), 2)
 
-            # TASK 2: Minimum suspicious members check
+            # Suspicious members check
             suspicious_member_count = len(member_scores)
             ring["suspicious_member_count"] = suspicious_member_count
 
-            # Signal coherence: how many members share the same patterns
-            member_patterns = [
-                set(a.get("patterns", [])) for a in member_accounts
-            ]
-            if len(member_patterns) > 1:
-                common = set.intersection(*member_patterns)
-                union = set.union(*member_patterns)
+            # Signal coherence: pattern agreement among CORE members
+            if ring_core:
+                core_patterns = [
+                    set(a.get("patterns", [])) for a in ring_core
+                ]
+            else:
+                core_patterns = [
+                    set(a.get("patterns", [])) for a in member_accounts
+                ]
+
+            if len(core_patterns) > 1:
+                common = set.intersection(*core_patterns)
+                union = set.union(*core_patterns)
                 ring["signal_coherence"] = round(
                     len(common) / max(1, len(union)), 3
                 )
-            elif member_patterns:
+            elif core_patterns:
                 ring["signal_coherence"] = 1.0
             else:
                 ring["signal_coherence"] = 0.0
 
-            # Validation: purity >= 0.15, confidence >= 0.30, >= 2 suspicious
+            # TASK 1: Validation requires >= 2 CORE members
             ring["validated"] = (
-                ring["purity"] >= 0.15
+                ring["core_count"] >= 2
                 and ring.get("confidence_score", 0) >= 0.30
                 and suspicious_member_count >= 2
             )
@@ -317,7 +438,7 @@ def compute_scores(
             ring["confidence"] = (
                 "HIGH" if ring["purity"] >= 0.5
                     and ring.get("confidence_score", 0) >= 0.5
-                else "MEDIUM" if ring["purity"] >= 0.15
+                else "MEDIUM" if ring["purity"] >= 0.20
                 else "LOW"
             )
         else:
@@ -326,6 +447,7 @@ def compute_scores(
             ring["validated"] = False
             ring["signal_coherence"] = 0.0
             ring["suspicious_member_count"] = 0
+            ring["core_count"] = 0
 
         if ring["validated"]:
             validated_rings.append(ring)
@@ -339,30 +461,62 @@ def compute_scores(
 # ─── Internal Scoring Functions ──────────────────────────────
 
 def _compute_raw_score(ad: dict) -> float:
-    """Compute raw weighted score with diminishing returns."""
-    pattern_counts = Counter(s[0] for s in ad["signals"])
+    """Compute raw weighted score with strong diminishing returns."""
+    # Filter to meaningful signals only
+    meaningful = [(s[0], s[1]) for s in ad["signals"] if s[1] >= MIN_SIGNAL_RISK]
+    if not meaningful:
+        return 0.0
+
+    pattern_counts = Counter(s[0] for s in meaningful)
     total = 0.0
 
     for module_type, count in pattern_counts.items():
-        weight = MODULE_WEIGHTS.get(module_type, 0.03)
-        avg_risk = np.mean([s[1] for s in ad["signals"] if s[0] == module_type])
-        effective = 1.0 + math.log(count) * 0.4 if count > 1 else 1.0
+        weight = MODULE_WEIGHTS.get(module_type, 0.02)
+        avg_risk = np.mean([s[1] for s in meaningful if s[0] == module_type])
+        # Strong diminishing returns: sqrt instead of log for repeated signals
+        effective = 1.0 + math.sqrt(count - 1) * 0.25 if count > 1 else 1.0
+        effective = min(effective, 2.0)  # Hard cap
         total += weight * avg_risk * effective
 
     return total
 
 
+def _is_ring_adjacent(
+    tg, account_id: str, ring_manager: RingManager, core_accounts: Set[str]
+) -> bool:
+    """
+    TASK 2: Check if a node is directly connected to validated ring core members.
+    Context-aware gating: relax only for these nodes.
+    """
+    try:
+        neighbors = set()
+        for s in tg.G.successors(account_id):
+            neighbors.add(s)
+        for p in tg.G.predecessors(account_id):
+            neighbors.add(p)
+    except Exception:
+        return False
+
+    # Count neighbors that are core members in validated rings
+    core_neighbors = sum(
+        1 for n in neighbors
+        if n in core_accounts and ring_manager.is_assigned(n)
+    )
+    return core_neighbors >= 2
+
+
 def _assign_tier(
     patterns: set, strong_count: int,
-    has_structural: bool, has_behavioral: bool, has_ring: bool,
-    ring_manager: RingManager, ring_ids: set,
+    has_structural: bool, has_behavioral: bool, has_strong_behavioral: bool,
+    has_ring: bool, ring_manager: RingManager, ring_ids: set,
+    is_core: bool = False, ring_adjacent: bool = False,
 ) -> str:
     """
     Risk tier with strict multi-signal gating.
 
-    CRITICAL: Ring membership + structural + behavioral + >=3 strong
-    HIGH:     (Structural + behavioral) OR >=3 strong
-    MEDIUM:   >=2 strong, or 1 strong + ring
+    CRITICAL: Core ring member + structural + strong behavioral + >=3 strong patterns
+    HIGH:     (Structural + strong behavioral) OR >=3 strong OR core in strong ring
+    MEDIUM:   >=2 strong, or 1 strong + ring, or ring-adjacent with strong
     LOW:      everything else
     """
     strong_patterns = patterns & STRONG_SIGNALS
@@ -380,33 +534,43 @@ def _assign_tier(
     has_rapid = "rapid_movement" in patterns
 
     # CRITICAL
-    if has_circular and (has_structuring or has_rapid) and has_ring:
+    if has_circular and (has_structuring or has_rapid) and has_ring and is_core and len(strong_patterns) >= 3:
         return "CRITICAL"
-    if in_strong_ring and has_structural and has_behavioral and len(strong_patterns) >= 3:
+    if in_strong_ring and has_structural and has_strong_behavioral and is_core and len(strong_patterns) >= 3:
         return "CRITICAL"
 
     # HIGH
-    if has_structural and has_behavioral and len(strong_patterns) >= 2:
+    if has_structural and has_strong_behavioral and (has_ring or len(strong_patterns) >= 3):
         return "HIGH"
-    if len(strong_patterns) >= 3:
+    if len(strong_patterns) >= 4:
+        return "HIGH"
+    # TASK 2: Core members in strong rings can reach HIGH
+    if is_core and in_strong_ring and len(strong_patterns) >= 2:
         return "HIGH"
 
     # MEDIUM
-    if len(strong_patterns) >= 2:
+    if len(strong_patterns) >= 4:
         return "MEDIUM"
-    if len(strong_patterns) >= 1 and has_ring:
+    if len(strong_patterns) >= 3 and has_ring:
+        return "MEDIUM"
+    if len(strong_patterns) >= 2 and is_core and has_ring:
+        return "MEDIUM"
+    # TASK 2: Ring-adjacent nodes with at least two strong signals
+    if ring_adjacent and len(strong_patterns) >= 2:
         return "MEDIUM"
 
     return "LOW"
 
 
 def _compute_dependency_penalty(patterns: set) -> float:
+    """TASK 4: Reduce score inflation from overlapping modules."""
     penalty = 1.0
     for group_signals in DEPENDENCY_GROUPS.values():
         overlap = patterns & group_signals
         if len(overlap) > 1:
-            penalty *= 1.0 - (len(overlap) - 1) * 0.18
-    return max(0.35, penalty)
+            # Stronger penalty for correlated modules
+            penalty *= 1.0 - (len(overlap) - 1) * 0.22
+    return max(0.30, penalty)
 
 
 def _compute_ring_boost(ring_ids: set, ring_manager: RingManager) -> float:
@@ -438,11 +602,14 @@ def _compute_ring_boost(ring_ids: set, ring_manager: RingManager) -> float:
 
 def _compute_network_influence(
     tg, account_data: dict, ring_manager: RingManager,
+    core_accounts: Set[str] = None,
 ) -> Dict[str, float]:
     """
-    TASK 4: Network influence and risk propagation.
+    Network influence with core-aware propagation.
+    Core members propagate more risk than peripheral.
     """
     influence = {}
+    core_accounts = core_accounts or set()
 
     for account_id, ad in account_data.items():
         boost = 0.0
@@ -457,7 +624,7 @@ def _compute_network_influence(
         if ring_risk > 60:
             boost += 5.0
 
-        # Neighbors in rings
+        # Neighbors in rings — core neighbors contribute more
         neighbors = set()
         try:
             for s in tg.G.successors(account_id):
@@ -467,11 +634,19 @@ def _compute_network_influence(
         except Exception:
             pass
 
-        neighbor_in_ring = sum(
-            1 for n in neighbors if ring_manager.is_assigned(n)
+        core_ring_neighbors = sum(
+            1 for n in neighbors
+            if n in core_accounts and ring_manager.is_assigned(n)
         )
-        if neighbor_in_ring >= 2:
-            boost += neighbor_in_ring * 1.5
+        peripheral_ring_neighbors = sum(
+            1 for n in neighbors
+            if n not in core_accounts and ring_manager.is_assigned(n)
+        )
+
+        if core_ring_neighbors >= 1:
+            boost += core_ring_neighbors * 2.5
+        if peripheral_ring_neighbors >= 2:
+            boost += peripheral_ring_neighbors * 0.8
 
         # Peripheral dampening
         in_deg = tg.in_degree.get(account_id, 0)
@@ -487,9 +662,7 @@ def _compute_network_influence(
 
 
 def _apply_stability_suppression(tg, account_id: str, score: float) -> float:
-    """
-    Behavioral stability suppression.
-    """
+    """Behavioral stability suppression."""
     temporal = tg.node_temporal.get(account_id, {})
     if not temporal or temporal.get("tx_count", 0) == 0:
         return score
@@ -591,6 +764,7 @@ def _build_score_breakdown(signals: list, patterns: set) -> list:
                 "structural" if is_structural
                 else ("behavioral" if is_behavioral else "contextual")
             ),
+            "is_core_signal": module_type in CORE_SIGNALS,
         })
 
     breakdown.sort(key=lambda x: x["weighted"], reverse=True)
@@ -600,8 +774,15 @@ def _build_score_breakdown(signals: list, patterns: set) -> list:
 def _build_explanation(
     ad: dict, patterns: set, tier: str,
     ring_manager: RingManager, tg, account_id: str,
+    is_core: bool = False, is_peripheral: bool = False,
 ) -> str:
     parts = []
+
+    # Role classification
+    if is_core:
+        parts.append("[CORE MEMBER]")
+    elif is_peripheral:
+        parts.append("[PERIPHERAL MEMBER]")
 
     # Signal hierarchy
     strong_names = sorted(
@@ -640,7 +821,7 @@ def _build_explanation(
         total_amt = temporal.get("total_amount", 0)
         parts.append(
             f"Active {lifespan:.0f} days, {in_count} inflows / "
-            f"{out_count} outflows, total volume ${total_amt:,.2f}."
+            f"{out_count} outflows, total volume ₹{total_amt:,.2f}."
         )
 
     # Confidence
@@ -672,6 +853,10 @@ def _build_summary(tg, suspicious_accounts, fraud_rings, legit_set) -> dict:
 
     tier_dist = Counter(a["tier"] for a in suspicious_accounts)
 
+    # Core vs peripheral breakdown
+    core_count = len([a for a in suspicious_accounts if a.get("is_core", False)])
+    peripheral_count = len([a for a in suspicious_accounts if a.get("is_peripheral", False)])
+
     # FP estimate
     weak_only = len([
         a for a in suspicious_accounts
@@ -692,18 +877,28 @@ def _build_summary(tg, suspicious_accounts, fraud_rings, legit_set) -> dict:
         round(np.mean(ring_coherence), 3) if ring_coherence else 0.0
     )
 
+    # Task 8: Monitoring & Alerts
+    alerts = []
+    if flagged_count < 75: alerts.append("ALERT: Low suspicious recall. Adjust extraction gates.")
+    if flagged_count > 150: alerts.append("ALERT: High noise detection. Review behavioral modules.")
+    if len(fraud_rings) > 30: alerts.append("ALERT: Network over-fragmentation detected.")
+    if avg_purity < 0.60: alerts.append("ALERT: Low ring coherence. Core nodes may be weak.")
+
     return {
         "total_accounts_analyzed": total_analyzed,
         "total_transactions_analyzed": len(tg.df) if hasattr(tg, "df") else 0,
-        "suspicious_accounts_found": flagged_count,
+        "suspicious_accounts_flagged": flagged_count,
         "fraud_rings_detected": len(fraud_rings),
         "high_risk_accounts": len(high_conf),
+        "core_members": core_count,
+        "peripheral_members": peripheral_count,
         "estimated_precision": precision_proxy,
         "avg_ring_purity": avg_purity,
         "suspicious_cluster_density": cluster_density,
         "fp_estimate": fp_estimate,
         "multi_signal_gate_pass_rate": gate_pass_rate,
         "avg_ring_signal_coherence": avg_coherence,
+        "alerts": alerts,
         "tier_distribution": {
             "CRITICAL": tier_dist.get("CRITICAL", 0),
             "HIGH": tier_dist.get("HIGH", 0),

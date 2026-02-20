@@ -285,8 +285,8 @@ def detect_community_suspicion(
             for _, _, d in sub_dir.edges(data=True)
         )
 
-        # Require meaningful flow (at least avg $1000 per node)
-        min_flow = len(community_nodes) * 1000
+        # Require meaningful flow (at least avg ₹80,000 per node)
+        min_flow = len(community_nodes) * 80000
         if total_flow < min_flow:
             continue
 
@@ -309,7 +309,7 @@ def detect_community_suspicion(
             density * 0.35
             + internal_ratio * 0.30
             + min(1.0, avg_centrality * 10) * 0.15
-            + min(1.0, total_flow / 500000) * 0.20
+            + min(1.0, total_flow / 40000000) * 0.20
         )
 
         if risk >= 0.3:
@@ -326,7 +326,7 @@ def detect_community_suspicion(
                 "risk_score": round(risk, 4),
                 "explanation": (
                     f"Dense community of {len(community_nodes)} accounts with density {density:.2%} "
-                    f"and ${total_flow:,.2f} internal flow ({internal_ratio:.0%} of total). "
+                    f"and ₹{total_flow:,.2f} internal flow ({internal_ratio:.0%} of total). "
                     f"Density exceeds {min_density:.0%} threshold."
                 )
             })
